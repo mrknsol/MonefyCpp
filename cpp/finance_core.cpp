@@ -19,5 +19,6 @@ double add_amounts(double left, double right) { return left + right; }
 double subtract_amounts(double left, double right) { return left - right; }
 
 bool is_valid_positive_amount(double amount) { return amount > 0.0; }
+bool is_valid_negative_amount(double amount) { return amount < 0.0; }
 
-} // namespace finance_core
+} 

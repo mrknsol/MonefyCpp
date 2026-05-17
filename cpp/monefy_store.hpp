@@ -26,23 +26,35 @@ public:
                    std::string &error);
   bool remove_card(const std::string &card_number, std::string &error);
   bool add_expense_transaction(const json &t, std::string &error);
+  bool add_income_transaction(const json &t, std::string &error);
   bool add_income(const std::string &card_number, double amount,
                   std::string &error);
   bool remove_transaction(std::int64_t id, std::string &error);
+  bool transfer_between_cards(const std::string &from_number,
+                              const std::string &to_number, double amount,
+                              const std::string &description,
+                              std::string &error);
+
+  void setUserId(const std::string &user_id);
+  void clearUserData();
 
 private:
   mutable std::mutex mutex_;
   std::string base_;
+  std::string user_id_;
   json cards_{json::array()};
   json transactions_{json::array()};
   json custom_categories_{json::array()};
   std::int64_t next_transaction_id_{1};
 
-  std::string cards_path() const { return base_ + "/cards.json"; }
-  std::string transactions_path() const { return base_ + "/transactions.json"; }
+  std::string user_dir() const { 
+    return user_id_.empty() ? base_ : base_ + "/user_" + user_id_;
+  }
+  std::string cards_path() const { return user_dir() + "/cards.json"; }
+  std::string transactions_path() const { return user_dir() + "/transactions.json"; }
   std::string custom_categories_path() const
   {
-    return base_ + "/custom_categories.json";
+    return user_dir() + "/custom_categories.json";
   }
 
   void load_or_default(std::string &error);
@@ -52,4 +64,5 @@ private:
 
   json *find_card_mut(const std::string &number);
   bool ensure_positive(double amount, std::string &error) const;
+  bool ensure_negative(double amount, std::string &error) const;
 };

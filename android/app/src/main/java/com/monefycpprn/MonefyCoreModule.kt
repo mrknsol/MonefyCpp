@@ -43,9 +43,22 @@ class MonefyCoreModule(reactContext: ReactApplicationContext) :
 
     @JvmStatic external fun nativeAddExpenseJson(json: String): Boolean
 
+    @JvmStatic external fun nativeAddIncomeJson(json: String): Boolean
+
     @JvmStatic external fun nativeAddIncome(cardNumber: String, amount: Double): Boolean
 
     @JvmStatic external fun nativeRemoveTransaction(id: Long): Boolean
+
+    @JvmStatic external fun nativeTransferBetweenCards(
+      fromCard: String,
+      toCard: String,
+      amount: Double,
+      description: String,
+    ): Boolean
+
+    @JvmStatic external fun nativeSetUserId(userId: String)
+
+    @JvmStatic external fun nativeClearUserData()
   }
 
   init {
@@ -130,6 +143,12 @@ class MonefyCoreModule(reactContext: ReactApplicationContext) :
   }
 
   @ReactMethod
+  fun addIncomeJson(json: String, promise: Promise) {
+    if (nativeAddIncomeJson(json)) promise.resolve(true)
+    else promise.reject("monefy", nativeGetLastError(), null)
+  }
+
+  @ReactMethod
   fun addIncome(cardNumber: String, amount: Double, promise: Promise) {
     if (nativeAddIncome(cardNumber, amount)) promise.resolve(true)
     else promise.reject("monefy", nativeGetLastError(), null)
@@ -140,5 +159,32 @@ class MonefyCoreModule(reactContext: ReactApplicationContext) :
     val id = transactionId.toLong()
     if (nativeRemoveTransaction(id)) promise.resolve(true)
     else promise.reject("monefy", nativeGetLastError(), null)
+  }
+
+  @ReactMethod
+  fun transferBetweenCards(
+    fromCard: String,
+    toCard: String,
+    amount: Double,
+    description: String,
+    promise: Promise,
+  ) {
+    if (nativeTransferBetweenCards(fromCard, toCard, amount, description)) {
+      promise.resolve(true)
+    } else {
+      promise.reject("monefy", nativeGetLastError(), null)
+    }
+  }
+
+  @ReactMethod
+  fun setUserId(userId: String, promise: Promise) {
+    nativeSetUserId(userId)
+    promise.resolve(true)
+  }
+
+  @ReactMethod
+  fun clearUserData(promise: Promise) {
+    nativeClearUserData()
+    promise.resolve(true)
   }
 }

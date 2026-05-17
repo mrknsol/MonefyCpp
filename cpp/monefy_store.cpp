@@ -1,10 +1,12 @@
 #include "monefy_store.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <chrono>
 #include <fstream>
 #include <map>
 #include <sstream>
+#include <filesystem>
 
 #include "cards_core.hpp"
 #include "finance_core.hpp"
@@ -29,6 +31,14 @@ bool read_json_file(const std::string &path, json &out, std::string &error)
 
 void write_json_file(const std::string &path, const json &data)
 {
+  // Создаем директорию если она не существует
+  std::filesystem::path file_path(path);
+  std::filesystem::path dir_path = file_path.parent_path();
+  
+  if (!dir_path.empty() && !std::filesystem::exists(dir_path)) {
+    std::filesystem::create_directories(dir_path);
+  }
+  
   std::ofstream out(path, std::ios::trunc);
   out << data.dump(2);
 }
@@ -48,6 +58,32 @@ bool MonefyStore::init(const std::string &documents_dir, std::string &error)
   }
   load_or_default(error);
   return error.empty();
+}
+
+void MonefyStore::setUserId(const std::string &user_id)
+{
+  std::lock_guard<std::mutex> lock(mutex_);
+  user_id_ = user_id;
+  
+  // Очищаем текущие данные из памяти
+  cards_ = json::array();
+  transactions_ = json::array();
+  custom_categories_ = json::array();
+  next_transaction_id_ = 1;
+  
+  // Загружаем данные для нового пользователя
+  std::string error;
+  load_or_default(error);
+}
+
+void MonefyStore::clearUserData()
+{
+  std::lock_guard<std::mutex> lock(mutex_);
+  user_id_.clear();
+  cards_ = json::array();
+  transactions_ = json::array();
+  custom_categories_ = json::array();
+  next_transaction_id_ = 1;
 }
 
 void MonefyStore::load_or_default(std::string &error)
@@ -239,8 +275,7 @@ json MonefyStore::category_totals_for_day(const std::string &yyyy_mm_dd) const
       order.push_back(k);
       aggs.push_back({amt, k.icon_name, k.icon_color});
     } else {
-      aggs[idx].amount =
-          finance_core::add_amounts(aggs[idx].amount, amt);
+      aggs[idx].amount += amt;
     }
   }
 
@@ -283,6 +318,15 @@ bool MonefyStore::ensure_positive(double amount, std::string &error) const
 {
   if (!finance_core::is_valid_positive_amount(amount)) {
     error = "amount must be positive";
+    return false;
+  }
+  return true;
+}
+
+bool MonefyStore::ensure_negative(double amount, std::string &error) const
+{
+  if (!finance_core::is_valid_negative_amount(amount)) {
+    error = "amount must be negative";
     return false;
   }
   return true;
@@ -382,6 +426,46 @@ bool MonefyStore::add_expense_transaction(const json &t, std::string &error)
     return false;
   }
   const double amount = t["amount"].get<double>();
+  if (!ensure_negative(amount, error)) {
+    return false;
+  }
+  if (!t.contains("paymentCard") || !t["paymentCard"].is_string()) {
+    error = "paymentCard required";
+    return false;
+  }
+  const std::string pay_card = t["paymentCard"].get<std::string>();
+  json *card = find_card_mut(pay_card);
+  if (!card) {
+    error = "payment card not found";
+    return false;
+  }
+  double bal = (*card)["balance"].get<double>();
+  bal = cards_core::withdraw_amount(bal, std::abs(amount));
+  (*card)["balance"] = bal;
+
+  json row = t;
+  row["id"] = next_transaction_id_++;
+  if (row.contains("date") && row["date"].is_string()) {
+    std::string d = row["date"].get<std::string>();
+    if (d.size() >= 10) {
+      row["date"] = d.substr(0, 10);
+    }
+  }
+
+  transactions_.push_back(row);
+  persist_cards_unsafe();
+  persist_transactions_unsafe();
+  return true;
+}
+
+bool MonefyStore::add_income_transaction(const json &t, std::string &error)
+{
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (!t.contains("amount") || !t["amount"].is_number()) {
+    error = "amount required";
+    return false;
+  }
+  const double amount = t["amount"].get<double>();
   if (!ensure_positive(amount, error)) {
     return false;
   }
@@ -396,7 +480,7 @@ bool MonefyStore::add_expense_transaction(const json &t, std::string &error)
     return false;
   }
   double bal = (*card)["balance"].get<double>();
-  bal = cards_core::withdraw_amount(bal, amount);
+  bal = cards_core::deposit_amount(bal, amount);
   (*card)["balance"] = bal;
 
   json row = t;
@@ -407,6 +491,8 @@ bool MonefyStore::add_expense_transaction(const json &t, std::string &error)
       row["date"] = d.substr(0, 10);
     }
   }
+  
+  // Debug logging for income
   transactions_.push_back(row);
   persist_cards_unsafe();
   persist_transactions_unsafe();
@@ -441,13 +527,17 @@ bool MonefyStore::remove_transaction(std::int64_t id, std::string &error)
     if (transactions_[i]["id"].get<std::int64_t>() != id)
       continue;
     const auto &t = transactions_[i];
-    double amount = t.value("amount", 0.0);
-    std::string pay = t.value("paymentCard", "");
-    if (!pay.empty() && finance_core::is_valid_positive_amount(amount)) {
+    const double amount = t.value("amount", 0.0);
+    const std::string pay = t.value("paymentCard", "");
+    if (!pay.empty()) {
       json *card = find_card_mut(pay);
       if (card) {
         double bal = (*card)["balance"].get<double>();
-        bal = cards_core::deposit_amount(bal, amount);
+        if (finance_core::is_valid_negative_amount(amount)) {
+          bal = cards_core::deposit_amount(bal, std::abs(amount));
+        } else if (finance_core::is_valid_positive_amount(amount)) {
+          bal = cards_core::withdraw_amount(bal, amount);
+        }
         (*card)["balance"] = bal;
       }
     }
@@ -459,6 +549,78 @@ bool MonefyStore::remove_transaction(std::int64_t id, std::string &error)
   }
   error = "transaction not found";
   return false;
+}
+
+bool MonefyStore::transfer_between_cards(const std::string &from_number,
+                                         const std::string &to_number,
+                                         double amount,
+                                         const std::string &description,
+                                         std::string &error)
+{
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (!ensure_positive(amount, error)) {
+    return false;
+  }
+  if (from_number == to_number) {
+    error = "cannot transfer to the same card";
+    return false;
+  }
+  json *from = find_card_mut(from_number);
+  json *to = find_card_mut(to_number);
+  if (!from || !to) {
+    error = "card not found";
+    return false;
+  }
+  double from_bal = (*from)["balance"].get<double>();
+  if (from_bal < amount) {
+    error = "insufficient funds";
+    return false;
+  }
+
+  (*from)["balance"] = cards_core::withdraw_amount(from_bal, amount);
+  double to_bal = (*to)["balance"].get<double>();
+  (*to)["balance"] = cards_core::deposit_amount(to_bal, amount);
+
+  const auto now = std::chrono::system_clock::now();
+  const auto tt = std::chrono::system_clock::to_time_t(now);
+  std::tm tm_buf{};
+#ifdef _WIN32
+  localtime_s(&tm_buf, &tt);
+#else
+  localtime_r(&tt, &tm_buf);
+#endif
+  char date_buf[11];
+  std::strftime(date_buf, sizeof(date_buf), "%Y-%m-%d", &tm_buf);
+  const std::string date_str(date_buf);
+
+  const std::string desc =
+      description.empty() ? "Transfer" : description;
+
+  json expense_row;
+  expense_row["amount"] = -amount;
+  expense_row["description"] = desc;
+  expense_row["category"] = "Transfer";
+  expense_row["iconName"] = "Transfer";
+  expense_row["iconColor"] = "#2563EB";
+  expense_row["date"] = date_str;
+  expense_row["paymentCard"] = from_number;
+  expense_row["id"] = next_transaction_id_++;
+
+  json income_row;
+  income_row["amount"] = amount;
+  income_row["description"] = desc;
+  income_row["category"] = "Transfer";
+  income_row["iconName"] = "Transfer";
+  income_row["iconColor"] = "#2563EB";
+  income_row["date"] = date_str;
+  income_row["paymentCard"] = to_number;
+  income_row["id"] = next_transaction_id_++;
+
+  transactions_.push_back(std::move(expense_row));
+  transactions_.push_back(std::move(income_row));
+  persist_cards_unsafe();
+  persist_transactions_unsafe();
+  return true;
 }
 
 void MonefyStore::persist_cards_unsafe() { write_json_file(cards_path(), cards_); }

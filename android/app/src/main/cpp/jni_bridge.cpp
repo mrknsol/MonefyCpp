@@ -145,6 +145,16 @@ Java_com_monefycpprn_MonefyCoreModule_nativeAddExpenseJson(JNIEnv *env, jclass,
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
+Java_com_monefycpprn_MonefyCoreModule_nativeAddIncomeJson(JNIEnv *env, jclass,
+                                                          jstring json)
+{
+  const char *s = env->GetStringUTFChars(json, nullptr);
+  int ok = monefy_add_income_json(s);
+  env->ReleaseStringUTFChars(json, s);
+  return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
 Java_com_monefycpprn_MonefyCoreModule_nativeAddIncome(JNIEnv *env, jclass,
                                                      jstring card,
                                                      jdouble amount)
@@ -162,4 +172,39 @@ Java_com_monefycpprn_MonefyCoreModule_nativeRemoveTransaction(JNIEnv *,
 {
   return monefy_remove_transaction(static_cast<long long>(id)) ? JNI_TRUE
                                                                  : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_monefycpprn_MonefyCoreModule_nativeTransferBetweenCards(
+    JNIEnv *env, jclass, jstring fromCard, jstring toCard, jdouble amount,
+    jstring description)
+{
+  const char *from = env->GetStringUTFChars(fromCard, nullptr);
+  const char *to = env->GetStringUTFChars(toCard, nullptr);
+  const char *desc = description ? env->GetStringUTFChars(description, nullptr)
+                                 : nullptr;
+  int ok = monefy_transfer_between_cards(from, to, amount, desc);
+  env->ReleaseStringUTFChars(fromCard, from);
+  env->ReleaseStringUTFChars(toCard, to);
+  if (desc && description) {
+    env->ReleaseStringUTFChars(description, desc);
+  }
+  return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_monefycpprn_MonefyCoreModule_nativeSetUserId(JNIEnv *env,
+                                                      jclass,
+                                                      jstring userId)
+{
+  const char *s = env->GetStringUTFChars(userId, nullptr);
+  monefy_set_user_id(s);
+  env->ReleaseStringUTFChars(userId, s);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_monefycpprn_MonefyCoreModule_nativeClearUserData(JNIEnv *,
+                                                          jclass)
+{
+  monefy_clear_user_data();
 }

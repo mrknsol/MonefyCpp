@@ -38,10 +38,20 @@ int monefy_remove_card(const char *card_number_utf8);
  * date (YYYY-MM-DD), paymentCard */
 int monefy_add_expense_json(const char *transaction_json);
 int monefy_add_custom_category_json(const char *category_json);
+int monefy_add_income_json(const char *transaction_json);
 
 int monefy_add_income(const char *card_number_utf8, double amount);
 
 int monefy_remove_transaction(long long transaction_id);
+
+/** Transfer `amount` from one card to another (atomic). */
+int monefy_transfer_between_cards(const char *from_card_utf8,
+                                  const char *to_card_utf8, double amount,
+                                  const char *description_utf8);
+
+/** User management functions */
+void monefy_set_user_id(const char *user_id);
+void monefy_clear_user_data(void);
 
 #ifdef __cplusplus
 }

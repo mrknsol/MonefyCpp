@@ -14,9 +14,18 @@ type CoreModule = {
   updateCardJson(oldNumber: string, json: string): Promise<boolean>;
   removeCard(cardNumber: string): Promise<boolean>;
   addExpenseJson(json: string): Promise<boolean>;
+  addIncomeJson(json: string): Promise<boolean>;
   addCustomCategoryJson(json: string): Promise<boolean>;
   addIncome(cardNumber: string, amount: number): Promise<boolean>;
   removeTransaction(transactionId: number): Promise<boolean>;
+  transferBetweenCards(
+    fromCard: string,
+    toCard: string,
+    amount: number,
+    description: string,
+  ): Promise<boolean>;
+  setUserId(userId: string): Promise<boolean>;
+  clearUserData(): Promise<boolean>;
 };
 
 const M = NativeModules.MonefyCoreModule as CoreModule;

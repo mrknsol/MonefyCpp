@@ -167,6 +167,19 @@ RCT_EXPORT_METHOD(addExpenseJson:(NSString *)json
   resolve(@YES);
 }
 
+RCT_EXPORT_METHOD(addIncomeJson:(NSString *)json
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+  MonefyEnsureInit();
+  if (!monefy_add_income_json(json.UTF8String)) {
+    reject(@"monefy", [NSString stringWithUTF8String:monefy_last_error()],
+           nil);
+    return;
+  }
+  resolve(@YES);
+}
+
 RCT_EXPORT_METHOD(addIncome:(NSString *)cardNumber
                   amount:(double)amount
                   resolver:(RCTPromiseResolveBlock)resolve
@@ -192,6 +205,41 @@ RCT_EXPORT_METHOD(removeTransaction:(nonnull NSNumber *)transactionId
            nil);
     return;
   }
+  resolve(@YES);
+}
+
+RCT_EXPORT_METHOD(transferBetweenCards:(NSString *)fromCard
+                  toCard:(NSString *)toCard
+                  amount:(double)amount
+                  description:(NSString *)description
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+  MonefyEnsureInit();
+  const char *desc = description.UTF8String ?: "";
+  if (!monefy_transfer_between_cards(fromCard.UTF8String, toCard.UTF8String,
+                                     amount, desc)) {
+    reject(@"monefy", [NSString stringWithUTF8String:monefy_last_error()],
+           nil);
+    return;
+  }
+  resolve(@YES);
+}
+
+RCT_EXPORT_METHOD(setUserId:(nonnull NSString *)userId
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+  MonefyEnsureInit();
+  monefy_set_user_id(userId.UTF8String);
+  resolve(@YES);
+}
+
+RCT_EXPORT_METHOD(clearUserData:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+  MonefyEnsureInit();
+  monefy_clear_user_data();
   resolve(@YES);
 }
 

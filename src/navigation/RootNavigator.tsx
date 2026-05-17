@@ -4,15 +4,18 @@ import React from 'react';
 import { useAppPreferences } from '../context/AppPreferencesContext';
 import { AddCardScreen } from '../screens/AddCardScreen';
 import { AddCustomCategoryScreen } from '../screens/AddCustomCategoryScreen';
+import { AddOperationScreen } from '../screens/AddOperationScreen';
 import { AllCategoriesScreen } from '../screens/AllCategoriesScreen';
 import { CalculatorScreen } from '../screens/CalculatorScreen';
 import { CardsScreen } from '../screens/CardsScreen';
 import { CategoriesScreen } from '../screens/CategoriesScreen';
 import { CategoryDaysScreen } from '../screens/CategoryDaysScreen';
 import { EditCardScreen } from '../screens/EditCardScreen';
-import { HomeScreen } from '../screens/HomeScreen';
+import { MainTabNavigator } from './MainTabNavigator';
 import { PayScreen } from '../screens/PayScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
+import { SetupPinScreen } from '../screens/SetupPinScreen';
+import { TransferScreen } from '../screens/TransferScreen';
 import type { Card } from '../types';
 
 export type RootStackParamList = {
@@ -39,6 +42,9 @@ export type RootStackParamList = {
   AllCategories: undefined;
   CategoryDays: { categoryId: string; title?: string };
   AddCustomCategory: undefined;
+  AddOperation: { type: 'expense' | 'income' };
+  Transfer: { fromCardNumber?: string };
+  SetupPin: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -65,7 +71,7 @@ export function RootNavigator() {
       }}>
       <Stack.Screen
         name="Home"
-        component={HomeScreen}
+        component={MainTabNavigator}
         options={{ headerShown: false }}
       />
       <Stack.Screen name="Calculator" component={CalculatorScreen} />
@@ -78,6 +84,9 @@ export function RootNavigator() {
       <Stack.Screen name="AllCategories" component={AllCategoriesScreen} />
       <Stack.Screen name="CategoryDays" component={CategoryDaysScreen} />
       <Stack.Screen name="AddCustomCategory" component={AddCustomCategoryScreen} />
+      <Stack.Screen name="AddOperation" component={AddOperationScreen} />
+      <Stack.Screen name="Transfer" component={TransferScreen} />
+      <Stack.Screen name="SetupPin" component={SetupPinScreen} />
     </Stack.Navigator>
   );
 }

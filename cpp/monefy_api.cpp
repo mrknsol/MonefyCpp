@@ -207,21 +207,53 @@ int monefy_add_expense_json(const char *transaction_json)
   std::lock_guard<std::mutex> lock(g_mutex);
   g_last_error.clear();
   if (!transaction_json) {
-    set_err("null transaction_json");
+    set_err("null transaction json");
     return 0;
   }
+  json t;
   try {
-    nlohmann::json j = nlohmann::json::parse(transaction_json);
-    std::string err;
-    if (!g_store.add_expense_transaction(j, err)) {
-      set_err(err);
-      return 0;
-    }
-    return 1;
+    t = json::parse(transaction_json);
   } catch (const std::exception &e) {
-    set_err(e.what());
+    set_err("invalid json: " + std::string(e.what()));
     return 0;
   }
+  if (!t.is_object()) {
+    set_err("invalid json: not an object");
+    return 0;
+  }
+  std::string err;
+  if (!g_store.add_expense_transaction(t, err)) {
+    set_err(err);
+    return 0;
+  }
+  return 1;
+}
+
+int monefy_add_income_json(const char *transaction_json)
+{
+  std::lock_guard<std::mutex> lock(g_mutex);
+  g_last_error.clear();
+  if (!transaction_json) {
+    set_err("null transaction json");
+    return 0;
+  }
+  json t;
+  try {
+    t = json::parse(transaction_json);
+  } catch (const std::exception &e) {
+    set_err("invalid json: " + std::string(e.what()));
+    return 0;
+  }
+  if (!t.is_object()) {
+    set_err("invalid json: not an object");
+    return 0;
+  }
+  std::string err;
+  if (!g_store.add_income_transaction(t, err)) {
+    set_err(err);
+    return 0;
+  }
+  return 1;
 }
 
 int monefy_add_custom_category_json(const char *category_json)
@@ -272,4 +304,42 @@ int monefy_remove_transaction(long long transaction_id)
     return 0;
   }
   return 1;
+}
+
+int monefy_transfer_between_cards(const char *from_card_utf8,
+                                  const char *to_card_utf8, double amount,
+                                  const char *description_utf8)
+{
+  std::lock_guard<std::mutex> lock(g_mutex);
+  g_last_error.clear();
+  if (!from_card_utf8 || !to_card_utf8) {
+    set_err("card numbers required");
+    return 0;
+  }
+  std::string desc = description_utf8 ? std::string(description_utf8) : "";
+  std::string err;
+  if (!g_store.transfer_between_cards(from_card_utf8, to_card_utf8, amount,
+                                      desc, err)) {
+    set_err(err);
+    return 0;
+  }
+  return 1;
+}
+
+void monefy_set_user_id(const char *user_id)
+{
+  std::lock_guard<std::mutex> lock(g_mutex);
+  g_last_error.clear();
+  if (user_id) {
+    g_store.setUserId(std::string(user_id));
+  } else {
+    g_store.setUserId("");
+  }
+}
+
+void monefy_clear_user_data(void)
+{
+  std::lock_guard<std::mutex> lock(g_mutex);
+  g_last_error.clear();
+  g_store.clearUserData();
 }

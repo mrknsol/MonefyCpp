@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -39,6 +40,7 @@ export function HomeScreen({ navigation }: Props) {
   const [cards, setCards] = useState<Card[]>([]);
   const [coreVer, setCoreVer] = useState('');
   const [customCats, setCustomCats] = useState<CustomCategory[]>([]);
+  const [activeTab, setActiveTab] = useState<'categories' | 'operations'>('categories');
 
   const reload = useCallback(async () => {
     try {
@@ -253,111 +255,136 @@ export function HomeScreen({ navigation }: Props) {
 
         <View style={[styles.sectionHead, { paddingHorizontal: space.lg }]}>
           <Text style={[styles.sectionLabel, { color: colors.textMuted }, typo.section]}>
-            {t('expensesByCategory').toUpperCase()}
+            {t('financialActivity').toUpperCase()}
           </Text>
         </View>
+        
         <View style={{ paddingHorizontal: space.lg }}>
-          {totals.length === 0 ? (
-            <View
+          <View style={[styles.tabContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <TouchableOpacity
               style={[
-                styles.emptyCard,
-                { backgroundColor: colors.card, borderColor: colors.border },
+                styles.tab,
+                { backgroundColor: activeTab === 'categories' ? colors.chip : 'transparent' }
+              ]}
+              onPress={() => setActiveTab('categories')}>
+              <Text style={[
+                styles.tabText,
+                { color: activeTab === 'categories' ? colors.text : colors.textMuted }
               ]}>
-              <Text style={[styles.emptyTxt, { color: colors.textSecondary }]}>
-                {t('noExpensesDay')}
+                {t('expensesByCategory')}
               </Text>
-            </View>
-          ) : (
-            totals.map(row => {
-              const label = resolveCategoryLabel(row.category, locale, customCats);
-              const glyph = categoryGlyph(row.iconName || 'Custom');
-              const pct = Math.min(100, (row.amount / maxSlice) * 100);
-              return (
-                <View
-                  key={`${row.category}-${row.iconColor}`}
-                  style={[
-                    styles.catCard,
-                    { backgroundColor: colors.card, borderColor: colors.border },
-                    cardShadow(false),
-                  ]}>
-                  <View
-                    style={[
-                      styles.catIconRing,
-                      { borderColor: row.iconColor, backgroundColor: colors.cardElevated },
-                    ]}>
-                    <Text style={styles.catGlyph}>{glyph}</Text>
-                  </View>
-                  <View style={styles.catBody}>
-                    <Text style={[styles.catName, { color: colors.text }]} numberOfLines={1}>
-                      {label}
-                    </Text>
-                    <View style={[styles.catBarBg, { backgroundColor: colors.barTrack }]}>
-                      <View
-                        style={[
-                          styles.catBarFill,
-                          { width: `${pct}%`, backgroundColor: row.iconColor },
-                        ]}
-                      />
-                    </View>
-                  </View>
-                  <Text style={[styles.catAmt, { color: colors.text }]}>{row.amount.toFixed(2)}</Text>
-                </View>
-              );
-            })
-          )}
-        </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.tab,
+                { backgroundColor: activeTab === 'operations' ? colors.chip : 'transparent' }
+              ]}
+              onPress={() => setActiveTab('operations')}>
+              <Text style={[
+                styles.tabText,
+                { color: activeTab === 'operations' ? colors.text : colors.textMuted }
+              ]}>
+                {t('operationsDay')}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-        <View style={[styles.sectionHead, { paddingHorizontal: space.lg, marginTop: space.xl }]}>
-          <Text style={[styles.sectionLabel, { color: colors.textMuted }, typo.section]}>
-            {t('operationsDay').toUpperCase()}
-          </Text>
-        </View>
-        <View style={{ paddingHorizontal: space.lg }}>
-          {transactions.length === 0 ? (
-            <View
-              style={[
-                styles.emptyCard,
-                { backgroundColor: colors.card, borderColor: colors.border },
-              ]}>
-              <Text style={[styles.emptyTxt, { color: colors.textSecondary }]}>
-                {t('noOperations')}
-              </Text>
-            </View>
-          ) : (
-            transactions.map((item, idx) => {
-              const catLabel = resolveCategoryLabel(item.category, locale, customCats);
-              const g = categoryGlyph(item.iconName || 'Custom');
-              const last = idx === transactions.length - 1;
-              return (
-                <Pressable
-                  key={item.id}
-                  onLongPress={() => deleteTx(item.id)}
-                  style={({ pressed }) => [
-                    styles.txCard,
-                    {
-                      backgroundColor: colors.card,
-                      borderColor: colors.border,
-                      marginBottom: last ? 0 : space.sm,
-                      opacity: pressed ? 0.96 : 1,
-                    },
-                    cardShadow(false),
-                  ]}>
-                  <View style={[styles.txAccent, { backgroundColor: colors.expense }]} />
-                  <Text style={styles.txGlyph}>{g}</Text>
-                  <View style={styles.txMid}>
-                    <Text style={[styles.txCat, { color: colors.text }]}>{catLabel}</Text>
-                    <Text
-                      style={[styles.txDesc, { color: colors.textMuted }]}
-                      numberOfLines={1}>
-                      {item.description || '—'} · {item.paymentCard}
-                    </Text>
+          {activeTab === 'categories' ? (
+            totals.length === 0 ? (
+              <View
+                style={[
+                  styles.emptyCard,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                ]}>
+                <Text style={[styles.emptyTxt, { color: colors.textSecondary }]}>
+                  {t('noExpensesDay')}
+                </Text>
+              </View>
+            ) : (
+              totals.map(row => {
+                const label = resolveCategoryLabel(row.category, locale, customCats);
+                const glyph = categoryGlyph(row.iconName || 'Custom');
+                const pct = Math.min(100, (row.amount / maxSlice) * 100);
+                return (
+                  <View
+                    key={`${row.category}-${row.iconColor}`}
+                    style={[
+                      styles.catCard,
+                      { backgroundColor: colors.card, borderColor: colors.border },
+                      cardShadow(false),
+                    ]}>
+                    <View
+                      style={[
+                        styles.catIconRing,
+                        { borderColor: row.iconColor, backgroundColor: colors.cardElevated },
+                      ]}>
+                      <Text style={styles.catGlyph}>{glyph}</Text>
+                    </View>
+                    <View style={styles.catBody}>
+                      <Text style={[styles.catName, { color: colors.text }]} numberOfLines={1}>
+                        {label}
+                      </Text>
+                      <View style={[styles.catBarBg, { backgroundColor: colors.barTrack }]}>
+                        <View
+                          style={[
+                            styles.catBarFill,
+                            { width: `${pct}%`, backgroundColor: row.iconColor },
+                          ]}
+                        />
+                      </View>
+                    </View>
+                    <Text style={[styles.catAmt, { color: colors.text }]}>{row.amount.toFixed(2)}</Text>
                   </View>
-                  <Text style={[styles.txAmt, { color: colors.expense }]}>
-                    −{item.amount.toFixed(2)}
-                  </Text>
-                </Pressable>
-              );
-            })
+                );
+              })
+            )
+          ) : (
+            transactions.length === 0 ? (
+              <View
+                style={[
+                  styles.emptyCard,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                ]}>
+                <Text style={[styles.emptyTxt, { color: colors.textSecondary }]}>
+                  {t('noOperations')}
+                </Text>
+              </View>
+            ) : (
+              transactions.map((item, idx) => {
+                const catLabel = resolveCategoryLabel(item.category, locale, customCats);
+                const g = categoryGlyph(item.iconName || 'Custom');
+                const last = idx === transactions.length - 1;
+                return (
+                  <Pressable
+                    key={item.id}
+                    onLongPress={() => deleteTx(item.id)}
+                    style={({ pressed }) => [
+                      styles.txCard,
+                      {
+                        backgroundColor: colors.card,
+                        borderColor: colors.border,
+                        marginBottom: last ? 0 : space.sm,
+                        opacity: pressed ? 0.96 : 1,
+                      },
+                      cardShadow(false),
+                    ]}>
+                    <View style={[styles.txAccent, { backgroundColor: colors.expense }]} />
+                    <Text style={styles.txGlyph}>{g}</Text>
+                    <View style={styles.txMid}>
+                      <Text style={[styles.txCat, { color: colors.text }]}>{catLabel}</Text>
+                      <Text
+                        style={[styles.txDesc, { color: colors.textMuted }]}
+                        numberOfLines={1}>
+                        {item.description || '—'} · {item.paymentCard}
+                      </Text>
+                    </View>
+                    <Text style={[styles.txAmt, { color: colors.expense }]}>
+                      −{item.amount.toFixed(2)}
+                    </Text>
+                  </Pressable>
+                );
+              })
+            )
           )}
         </View>
 
@@ -400,11 +427,12 @@ const styles = StyleSheet.create({
   dateRail: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     padding: space.sm,
     borderRadius: radii.lg,
     borderWidth: 1,
     marginBottom: space.lg,
+    gap: space.md,
   },
   railBtn: {
     width: 48,
@@ -530,5 +558,23 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 0.5,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    borderRadius: radii.lg,
+    padding: space.xs,
+    marginBottom: space.md,
+    borderWidth: 1,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: space.sm,
+    paddingHorizontal: space.md,
+    borderRadius: radii.md,
+    alignItems: 'center',
+  },
+  tabText: {
+    fontWeight: '700',
+    fontSize: 14,
   },
 });

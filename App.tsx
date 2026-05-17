@@ -8,12 +8,16 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppPreferencesProvider, useAppPreferences } from './src/context/AppPreferencesContext';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { SecurityProvider } from './src/context/SecurityContext';
+import { AuthNavigator } from './src/navigation/AuthNavigator';
 import { RootNavigator } from './src/navigation/RootNavigator';
 
-function AppReady() {
+function AppContent() {
   const { ready, colors } = useAppPreferences();
+  const { user, isLoading } = useAuth();
 
-  if (!ready) {
+  if (!ready || isLoading) {
     return (
       <View style={[styles.boot, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.accentMuted} />
@@ -21,10 +25,24 @@ function AppReady() {
     );
   }
 
+  if (!user) {
+    return <AuthNavigator />;
+  }
+
   return (
-    <NavigationContainer>
-      <RootNavigator />
-    </NavigationContainer>
+    <SecurityProvider>
+      <NavigationContainer>
+        <RootNavigator />
+      </NavigationContainer>
+    </SecurityProvider>
+  );
+}
+
+function AppReady() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

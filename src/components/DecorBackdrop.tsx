@@ -9,14 +9,14 @@ export function DecorBackdrop({ colors }: { colors: ThemeColors }) {
       <View
         style={[
           styles.blob,
-          styles.blobTeal,
+          styles.blobPrimary,
           { backgroundColor: colors.decorTeal },
         ]}
       />
       <View
         style={[
           styles.blob,
-          styles.blobAmber,
+          styles.blobGold,
           { backgroundColor: colors.decorAmber },
         ]}
       />
@@ -29,16 +29,16 @@ const styles = StyleSheet.create({
     position: 'absolute',
     borderRadius: 999,
   },
-  blobTeal: {
-    width: 280,
-    height: 280,
-    top: -80,
-    right: -100,
+  blobPrimary: {
+    width: 320,
+    height: 320,
+    top: -120,
+    right: -120,
   },
-  blobAmber: {
-    width: 220,
-    height: 220,
-    bottom: '15%',
-    left: -90,
+  blobGold: {
+    width: 200,
+    height: 200,
+    bottom: '20%',
+    left: -80,
   },
 });

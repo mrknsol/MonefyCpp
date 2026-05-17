@@ -15,6 +15,8 @@ const GLYPHS: Record<string, string> = {
   CarRepair: '🔧',
   Marketplace: '🛒',
   Custom: '✨',
+  TopUp: '💰',
+  Transfer: '↔️',
 };
 
 export function categoryGlyph(iconName: string): string {
