@@ -9,7 +9,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnimatedPressable, animateNextLayout } from '../components/AnimatedPressable';
-import { categoryGlyph } from '../constants/categoryGlyphs';
+import { AppIcon } from '../components/AppIcon';
+import { categoryIconName } from '../constants/categoryGlyphs';
 import { useAppPreferences } from '../context/AppPreferencesContext';
 import { resolveCategoryLabel } from '../i18n/translations';
 import { MonefyCore, parseJson } from '../native/monefyCore';
@@ -85,7 +86,7 @@ export function StatisticsScreen() {
     const isExpense = item.amount < 0;
     const accentColor = isExpense ? colors.expense : colors.income;
     const catLabel = resolveCategoryLabel(item.category, locale, customCats);
-    const glyph = categoryGlyph(item.iconName || 'Custom');
+    const iconName = categoryIconName(item.iconName || 'Custom');
 
     return (
       <AnimatedPressable
@@ -96,7 +97,12 @@ export function StatisticsScreen() {
           cardShadow(false),
         ]}>
         <View style={[styles.txAccent, { backgroundColor: accentColor }]} />
-        <Text style={styles.txGlyph}>{glyph}</Text>
+        <AppIcon
+          name={iconName}
+          color={accentColor}
+          backgroundColor={colors.chip}
+          size={34}
+        />
         <View style={styles.txMid}>
           <Text style={[styles.txCat, { color: colors.text }]}>{catLabel}</Text>
           <Text style={[styles.txDesc, { color: colors.textMuted }]} numberOfLines={1}>

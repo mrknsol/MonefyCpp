@@ -36,6 +36,7 @@ export function formatDayForPreferences(
     es: 'es-ES',
     tr: 'tr-TR',
     zh: 'zh-CN',
+    id: 'id-ID',
   };
   const loc = intlLocale[locale] ?? 'en-US';
   if (mode === 'iso') {

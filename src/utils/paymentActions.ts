@@ -1,12 +1,14 @@
+import type { AppIconName } from '../components/AppIcon';
+
 export type PaymentActionId = 'transfer' | 'topup' | 'expense';
 
 export const PAYMENT_ACTION_META: Record<
   PaymentActionId,
-  { icon: string; labelKey: 'transfer' | 'topUpLabel' | 'expense' }
+  { iconName: AppIconName; labelKey: 'transfer' | 'topUpLabel' | 'expense' }
 > = {
-  transfer: { icon: '↔️', labelKey: 'transfer' },
-  topup: { icon: '💰', labelKey: 'topUpLabel' },
-  expense: { icon: '💸', labelKey: 'expense' },
+  transfer: { iconName: 'transfer', labelKey: 'transfer' },
+  topup: { iconName: 'topup', labelKey: 'topUpLabel' },
+  expense: { iconName: 'expense', labelKey: 'expense' },
 };
 
 export function navigatePayment(

@@ -10,22 +10,23 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnimatedPressable, animateNextLayout } from '../components/AnimatedPressable';
+import { AppIcon } from '../components/AppIcon';
 import { CompactCardChip } from '../components/CompactCardChip';
 import { CurrencyRatesPanel } from '../components/CurrencyRatesPanel';
 import { DecorBackdrop } from '../components/DecorBackdrop';
-import { categoryGlyph } from '../constants/categoryGlyphs';
+import { categoryIconName } from '../constants/categoryGlyphs';
+import { getServicePayment } from '../constants/servicePayments';
 import { useAppPreferences } from '../context/AppPreferencesContext';
 import { useAuth } from '../context/AuthContext';
 import { resolveCategoryLabel } from '../i18n/translations';
 import { MonefyCore, parseJson } from '../native/monefyCore';
-import { getRecentPayments, recordRecentPayment } from '../services/recentPayments';
+import { getRecentPayments, recordRecentPayment, type RecentPayment } from '../services/recentPayments';
 import type { Card, CustomCategory, Transaction } from '../types';
 import { cardShadow, radii, space } from '../theme/tokens';
 import { loadCustomCategories } from '../utils/categories';
 import { formatDayIso } from '../utils/date';
 import {
   navigatePayment,
-  PAYMENT_ACTION_META,
   type PaymentActionId,
 } from '../utils/paymentActions';
 
@@ -45,7 +46,7 @@ export function HomeScreenSimple() {
   const [customCats, setCustomCats] = useState<CustomCategory[]>([]);
   const [activeTab, setActiveTab] = useState<ActivityTab>('expense');
   const [coreVer, setCoreVer] = useState('');
-  const [recentPayments, setRecentPayments] = useState<PaymentActionId[]>([]);
+  const [recentPayments, setRecentPayments] = useState<RecentPayment[]>([]);
   const [expandedCardNumber, setExpandedCardNumber] = useState<string | null>(null);
 
   const selectedCard = useMemo(
@@ -74,7 +75,7 @@ export function HomeScreenSimple() {
 
       if (user?.id) {
         const recent = await getRecentPayments(user.id);
-        setRecentPayments(recent.map(item => item.id));
+        setRecentPayments(recent);
       }
 
       setSelectedCardNumber(prev => {
@@ -89,13 +90,41 @@ export function HomeScreenSimple() {
   }, [dayIso, user?.id]);
 
   const openQuickPayment = async (id: PaymentActionId) => {
-    if (user?.id) {
-      await recordRecentPayment(user.id, id);
-      const recent = await getRecentPayments(user.id);
-      setRecentPayments(recent.map(item => item.id));
-    }
     navigatePayment(navigation, id, {
       fromCardNumber: selectedCardNumber ?? undefined,
+    });
+  };
+
+  const openRecentPayment = async (item: RecentPayment) => {
+    if (user?.id) {
+      if (item.kind === 'service') {
+        await recordRecentPayment(user.id, { kind: 'service', id: item.id });
+      } else {
+        await recordRecentPayment(user.id, { kind: 'custom', id: item.id });
+      }
+      const recent = await getRecentPayments(user.id);
+      setRecentPayments(recent);
+    }
+    if (item.kind === 'custom') {
+      const custom = customCats.find(category => category.id === item.id);
+      if (!custom) {
+        return;
+      }
+      navigation.navigate('AddOperation', {
+        type: 'expense',
+        categoryId: custom.id,
+        description: custom.label,
+      });
+      return;
+    }
+    const service = getServicePayment(item.id);
+    if (!service) {
+      return;
+    }
+    navigation.navigate('AddOperation', {
+      type: 'expense',
+      categoryId: service.categoryId,
+      description: t(service.descriptionKey),
     });
   };
 
@@ -222,21 +251,36 @@ export function HomeScreenSimple() {
               variant="tile"
               style={[styles.quickBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
               onPress={() => openQuickPayment('transfer')}>
-              <Text style={styles.quickIcon}>↔️</Text>
+              <AppIcon
+                name="transfer"
+                color={colors.brand}
+                backgroundColor={colors.brandSoft}
+                style={styles.quickIcon}
+              />
               <Text style={[styles.quickLabel, { color: colors.text }]}>{t('transfer')}</Text>
             </AnimatedPressable>
             <AnimatedPressable
               variant="tile"
               style={[styles.quickBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
               onPress={() => openQuickPayment('topup')}>
-              <Text style={styles.quickIcon}>💰</Text>
+              <AppIcon
+                name="topup"
+                color={colors.income}
+                backgroundColor={colors.chip}
+                style={styles.quickIcon}
+              />
               <Text style={[styles.quickLabel, { color: colors.text }]}>{t('topUpLabel')}</Text>
             </AnimatedPressable>
             <AnimatedPressable
               variant="tile"
               style={[styles.quickBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
               onPress={() => openQuickPayment('expense')}>
-              <Text style={styles.quickIcon}>💸</Text>
+              <AppIcon
+                name="expense"
+                color={colors.expense}
+                backgroundColor={colors.chip}
+                style={styles.quickIcon}
+              />
               <Text style={[styles.quickLabel, { color: colors.text }]}>{t('expense')}</Text>
             </AnimatedPressable>
           </View>
@@ -247,20 +291,31 @@ export function HomeScreenSimple() {
                 {t('recentPayments').toUpperCase()}
               </Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {recentPayments.map(id => {
-                  const meta = PAYMENT_ACTION_META[id];
+                {recentPayments.map(item => {
+                  const service = item.kind === 'service' ? getServicePayment(item.id) : null;
+                  const custom = item.kind === 'custom'
+                    ? customCats.find(category => category.id === item.id)
+                    : null;
+                  if (!service && !custom) {
+                    return null;
+                  }
                   return (
                     <AnimatedPressable
-                      key={id}
+                      key={`${item.kind}:${item.id}`}
                       variant="soft"
-                      onPress={() => openQuickPayment(id)}
+                      onPress={() => openRecentPayment(item)}
                       style={[
                         styles.recentChip,
                         { backgroundColor: colors.chip, borderColor: colors.border },
                       ]}>
-                      <Text style={styles.recentIcon}>{meta.icon}</Text>
+                      <AppIcon
+                        name={service ? service.iconName : categoryIconName(custom!.iconName)}
+                        color={service ? colors.brand : custom!.iconColor}
+                        backgroundColor={colors.card}
+                        size={24}
+                      />
                       <Text style={[styles.recentLabel, { color: colors.text }]}>
-                        {t(meta.labelKey)}
+                        {service ? t(service.labelKey) : custom!.label}
                       </Text>
                     </AnimatedPressable>
                   );
@@ -337,7 +392,7 @@ export function HomeScreenSimple() {
           ) : (
             visibleTransactions.map((item, idx) => {
               const catLabel = resolveCategoryLabel(item.category, locale, customCats);
-              const glyph = categoryGlyph(item.iconName || 'Custom');
+              const iconName = categoryIconName(item.iconName || 'Custom');
               const isExpense = item.amount < 0;
               const accentColor = isExpense ? colors.expense : colors.income;
               const last = idx === visibleTransactions.length - 1;
@@ -357,7 +412,12 @@ export function HomeScreenSimple() {
                     cardShadow(false),
                   ]}>
                   <View style={[styles.txAccent, { backgroundColor: accentColor }]} />
-                  <Text style={styles.txGlyph}>{glyph}</Text>
+                  <AppIcon
+                    name={iconName}
+                    color={accentColor}
+                    backgroundColor={colors.chip}
+                    size={34}
+                  />
                   <View style={styles.txMid}>
                     <Text style={[styles.txCat, { color: colors.text }]}>{catLabel}</Text>
                     <Text
@@ -445,7 +505,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...cardShadow(false),
   },
-  quickIcon: { fontSize: 26, marginBottom: space.xs },
+  quickIcon: { marginBottom: space.xs },
   quickLabel: { fontSize: 12, fontWeight: '700', textAlign: 'center' },
   recentBlock: { marginTop: space.md },
   recentTitle: {

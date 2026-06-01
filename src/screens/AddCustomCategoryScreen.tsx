@@ -10,8 +10,9 @@ import {
 } from 'react-native';
 
 import { AnimatedPressable } from '../components/AnimatedPressable';
+import { AppIcon } from '../components/AppIcon';
 import { EXPENSE_CATEGORIES } from '../constants/categories';
-import { categoryGlyph } from '../constants/categoryGlyphs';
+import { categoryIconName } from '../constants/categoryGlyphs';
 import { useAppPreferences } from '../context/AppPreferencesContext';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { MonefyCore } from '../native/monefyCore';
@@ -100,7 +101,13 @@ export function AddCustomCategoryScreen({ navigation }: Props) {
               },
             ]}
             onPress={() => setPicked(p)}>
-            <Text style={styles.tileGlyph}>{categoryGlyph(p.iconName)}</Text>
+            <AppIcon
+              name={categoryIconName(p.iconName)}
+              color={p.color}
+              backgroundColor={colors.chip}
+              size={34}
+              style={styles.tileGlyph}
+            />
           </AnimatedPressable>
         ))}
       </View>
@@ -134,7 +141,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  tileGlyph: { fontSize: 28 },
+  tileGlyph: {},
   save: {
     marginTop: 28,
     padding: 16,

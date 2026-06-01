@@ -17,6 +17,7 @@ export const PHONE_COUNTRIES: PhoneCountry[] = [
   { code: 'DE', dial: '+49', flag: '🇩🇪', nameKey: 'countryDE' },
   { code: 'TR', dial: '+90', flag: '🇹🇷', nameKey: 'countryTR' },
   { code: 'CN', dial: '+86', flag: '🇨🇳', nameKey: 'countryCN' },
+  { code: 'ID', dial: '+62', flag: '🇮🇩', nameKey: 'countryID' },
 ];
 
 export function defaultPhoneCountry(locale: AppLocale): PhoneCountry {
@@ -27,6 +28,7 @@ export function defaultPhoneCountry(locale: AppLocale): PhoneCountry {
     de: 'DE',
     tr: 'TR',
     zh: 'CN',
+    id: 'ID',
     en: 'US',
     fr: 'US',
     es: 'US',

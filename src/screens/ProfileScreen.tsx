@@ -31,7 +31,7 @@ import { cardShadow, radii, space } from '../theme/tokens';
 
 export function ProfileScreen() {
   const { colors, t, locale, setLocale, themeMode, setThemeMode } = useAppPreferences();
-  const { user, logout, updateUser } = useAuth();
+  const { user, logout, beginSwitchAccount, updateUser } = useAuth();
   const { hasPin, faceIdEnabled, setFaceIdEnabled, biometricKind } = useSecurity();
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
@@ -75,10 +75,9 @@ export function ProfileScreen() {
   };
 
   const handleSwitchAccount = () => {
-    Alert.alert(t('switchAccountTitle'), t('switchAccountConfirm'), [
-      { text: t('cancel'), style: 'cancel' },
-      { text: t('switchAccount'), onPress: logout },
-    ]);
+    beginSwitchAccount().catch((e: unknown) => {
+      Alert.alert(t('error'), String(e));
+    });
   };
 
   const toggleFaceId = async (value: boolean) => {

@@ -1,97 +1,153 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Monefy Bank
 
-# Getting Started
+Cross-platform mobile banking application built with **React Native** and a **C++ REST API** backed by **PostgreSQL**. The project demonstrates card management, categorized transactions, transfers, service payments, statistics, multi-language UI, and payment security (PIN / biometrics).
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+> Educational / university project. Not intended for production financial use.
 
-## Step 1: Start Metro
+## Features
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+- **Authentication** — register, login, logout, Steam-style account switching with saved sessions
+- **Cards** — add, edit, delete; visual card with flip animation, copy number, CVV toggle
+- **Transactions** — expenses and top-ups by category; built-in and custom categories
+- **Payments** — service shortcuts (utilities, mobile, transport, etc.) and custom payment categories
+- **Transfers** — between own cards or to another user by card number
+- **Statistics** — spending and income by period (week, month, quarter, year)
+- **Profile** — phone binding, theme (light / dark / system), 10 languages
+- **Security** — payment PIN, optional Face ID / Touch ID
+- **Extras** — loan flow (demo), messages, feedback, currency rates on home
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+## Architecture
+
+```
+┌──────────────────────────────┐
+│   React Native (TypeScript)   │  iOS & Android
+│   UI · Navigation · i18n      │
+└──────────────┬───────────────┘
+               │ HTTPS + Bearer token
+               ▼
+┌──────────────────────────────┐
+│   C++ API (Drogon) :8080      │
+└──────────────┬───────────────┘
+               │ SQL
+               ▼
+┌──────────────────────────────┐
+│   PostgreSQL 16               │
+└──────────────────────────────┘
+```
+
+The mobile app uses a `MonefyCore` facade (`src/native/monefyCore.ts`) that talks to the REST API. Native C++ modules under `cpp/` provide finance/card logic and can be linked via JNI (Android) and Objective-C++ (iOS).
+
+## Tech stack
+
+| Layer | Technologies |
+|--------|----------------|w
+| Mobile | React Native 0.85, React 19, TypeScript, React Navigation |
+| Local storage | AsyncStorage (preferences, sessions, saved accounts) |
+| Security | react-native-biometrics, app PIN |
+| API | C++17, Drogon, libpqxx, OpenSSL |
+| Database | PostgreSQL 16, Docker Compose |
+| Build | Metro, CocoaPods (iOS), Gradle (Android), CMake |
+
+## Project structure
+
+```
+MonefyCppRn/
+├── App.tsx                 # Root providers & auth gate
+├── src/
+│   ├── api/                # HTTP client & auth/profile API
+│   ├── components/         # UI (cards, tab bar, icons, animations)
+│   ├── context/            # Auth, security, preferences
+│   ├── navigation/         # Tabs & stack navigators
+│   ├── screens/            # App screens
+│   ├── services/           # Saved accounts, recent payments, rates
+│   ├── i18n/               # Translations (10 locales)
+│   └── native/             # MonefyCore bridge → REST
+├── cpp/                    # C++ domain logic & C API header
+├── backend/monefy-bank-api/
+│   ├── src/main.cpp        # Drogon server
+│   ├── sql/schema.sql      # Database schema
+│   └── docker-compose.yml  # Local PostgreSQL
+├── android/ · ios/         # Native projects & MonefyCore modules
+└── docs/                   # Project documentation & final report
+```
+
+## Prerequisites
+
+- **Node.js** ≥ 22.11
+- **npm**
+- **Xcode** (iOS) or **Android Studio** (Android)
+- **Docker Desktop** (for PostgreSQL)
+- **CMake**, **Drogon**, **libpqxx**, **OpenSSL** (for the C++ API — see [backend README](backend/monefy-bank-api/README.md))
+
+## Getting started
+
+### 1. Database
+
+From the repository root:
 
 ```sh
-# Using npm
+docker compose -f backend/monefy-bank-api/docker-compose.yml up -d
+```
+
+Default connection (see `backend/monefy-bank-api/.env.example`):
+
+- Host: `localhost:5433`
+- Database: `fastbite0_SampleDB`
+- User / password: `admin` / `admin`
+
+### 2. API server
+
+```sh
+export MONEFY_DB_CONNECTION="host=localhost port=5433 dbname=fastbite0_SampleDB user=admin password=admin"
+export MONEFY_API_PORT=8080
+
+cmake -S backend/monefy-bank-api -B backend/monefy-bank-api/build
+cmake --build backend/monefy-bank-api/build
+./backend/monefy-bank-api/build/monefy_bank_api
+```
+
+Tables are created from `backend/monefy-bank-api/sql/schema.sql` on startup.
+
+### 3. Mobile app
+
+```sh
+npm install
+
+# iOS (first time / after native dep changes)
+cd ios && bundle install && bundle exec pod install && cd ..
+
 npm start
-
-# OR using Yarn
-yarn start
-```
-
-## Step 2: Build and run your app
-
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
-
-```sh
-# Using npm
-npm run android
-
-# OR using Yarn
-yarn android
-```
-
-### iOS
-
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
-```
-
-Then, and every time you update your native dependencies, run:
-
-```sh
-bundle exec pod install
-```
-
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
-
-```sh
-# Using npm
+# In another terminal:
 npm run ios
-
-# OR using Yarn
-yarn ios
+# or
+npm run android
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+### API URL on a physical device
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+Emulators use `localhost` or `10.0.2.2` by default (`src/api/client.ts`). On a real phone, set `API_BASE_URL` to your computer’s LAN IP, for example:
 
-## Step 3: Modify your app
+`http://192.168.1.10:8080`
 
-Now that you have successfully run the app, let's make changes!
+## Scripts
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+| Command | Description |
+|---------|-------------|
+| `npm start` | Start Metro bundler |
+| `npm run ios` | Run on iOS simulator |
+| `npm run android` | Run on Android emulator |
+| `npm run lint` | ESLint |
+| `npm test` | Jest |
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+## Documentation
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+- [Backend API setup](backend/monefy-bank-api/README.md)
+- [Final project report](docs/Monefy_Final_Project_Report.md) — architecture, features, and design decisions (~5000 words)
 
-## Congratulations! :tada:
+## Security note
 
-You've successfully run and modified your React Native App. :partying_face:
+Passwords are hashed on the server (salt + SHA-256). Session tokens are stored in AsyncStorage for convenience (including quick account switch). This is appropriate for a **demo / coursework** app only — production banking apps require stricter key storage, certificate pinning, and compliance controls.
 
-### Now what?
+## License
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+University coursework project. All rights reserved by the authors unless your institution specifies otherwise.

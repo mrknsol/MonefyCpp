@@ -9,7 +9,8 @@ import {
 } from 'react-native';
 
 import { AnimatedPressable } from '../components/AnimatedPressable';
-import { categoryGlyph } from '../constants/categoryGlyphs';
+import { AppIcon } from '../components/AppIcon';
+import { categoryIconName } from '../constants/categoryGlyphs';
 import { useAppPreferences } from '../context/AppPreferencesContext';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import type { ThemeColors } from '../theme/colors';
@@ -39,7 +40,13 @@ function CategoryListRow({
         cardShadow(false),
       ]}
       onPress={() => onOpen(item.id, item.label)}>
-      <Text style={styles.glyph}>{categoryGlyph(item.iconName)}</Text>
+      <AppIcon
+        name={categoryIconName(item.iconName)}
+        color={item.color}
+        backgroundColor={colors.chip}
+        size={40}
+        style={styles.glyph}
+      />
       <View style={styles.rowText}>
         <Text style={[styles.name, { color: colors.text }]}>{item.label}</Text>
         {item.isCustom ? (
@@ -133,7 +140,7 @@ const styles = StyleSheet.create({
     marginBottom: space.sm,
     borderWidth: 1,
   },
-  glyph: { fontSize: 28, marginRight: space.md },
+  glyph: { marginRight: space.md },
   rowText: { flex: 1 },
   name: { fontSize: 16, fontWeight: '700' },
   badge: { fontSize: 12, marginTop: 4, fontWeight: '600' },

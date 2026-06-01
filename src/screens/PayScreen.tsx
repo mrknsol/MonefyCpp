@@ -5,10 +5,12 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  View,
 } from 'react-native';
 
 import { AnimatedPressable } from '../components/AnimatedPressable';
-import { categoryGlyph } from '../constants/categoryGlyphs';
+import { AppIcon } from '../components/AppIcon';
+import { categoryIconName } from '../constants/categoryGlyphs';
 import { useAppPreferences } from '../context/AppPreferencesContext';
 import { resolveCategoryLabel } from '../i18n/translations';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -62,16 +64,24 @@ export function PayScreen({ navigation, route }: Props) {
   };
 
   const catTitle = resolveCategoryLabel(category, locale, customCats);
-  const glyph = categoryGlyph(iconName || 'Custom');
+  const resolvedIconName = categoryIconName(iconName || 'Custom');
 
   return (
     <ScrollView
       style={{ backgroundColor: colors.background }}
       contentContainerStyle={styles.wrap}>
       <Text style={[styles.head, { color: colors.text }]}>{t('pickDebitCard')}</Text>
-      <Text style={[styles.sum, { color: colors.textSecondary }]}>
-        {glyph} {amount.toFixed(2)} · {catTitle}
-      </Text>
+      <View style={styles.summaryRow}>
+        <AppIcon
+          name={resolvedIconName}
+          color={iconColor}
+          backgroundColor={colors.chip}
+          size={34}
+        />
+        <Text style={[styles.sum, { color: colors.textSecondary }]}>
+          {amount.toFixed(2)} · {catTitle}
+        </Text>
+      </View>
       {cards.map(c => (
         <AnimatedPressable
           key={c.number}
@@ -97,7 +107,8 @@ export function PayScreen({ navigation, route }: Props) {
 const styles = StyleSheet.create({
   wrap: { padding: 16 },
   head: { fontSize: 17, fontWeight: '600', marginBottom: 8 },
-  sum: { marginBottom: 16, fontSize: 15 },
+  summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
+  sum: { fontSize: 15, flex: 1 },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',

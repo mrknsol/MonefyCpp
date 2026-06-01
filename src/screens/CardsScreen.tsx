@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnimatedPressable } from '../components/AnimatedPressable';
+import { AppIcon } from '../components/AppIcon';
 import { BankCardVisual } from '../components/BankCardVisual';
 import { useAppPreferences } from '../context/AppPreferencesContext';
 import { useSecurity } from '../context/SecurityContext';
@@ -113,7 +114,13 @@ export function CardsScreen({ navigation }: Props) {
               styles.emptyBox,
               { backgroundColor: colors.card, borderColor: colors.border },
             ]}>
-            <Text style={styles.emptyIcon}>💳</Text>
+            <AppIcon
+              name="card"
+              color={colors.brand}
+              backgroundColor={colors.brandSoft}
+              size={52}
+              style={styles.emptyIcon}
+            />
             <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('noCardsYet')}</Text>
             <Text style={[styles.emptyHint, { color: colors.textMuted }]}>
               {t('addCardHint')}
@@ -214,7 +221,7 @@ const styles = StyleSheet.create({
     padding: space.xxl,
     alignItems: 'center',
   },
-  emptyIcon: { fontSize: 48, marginBottom: space.md },
+  emptyIcon: { marginBottom: space.md },
   emptyTitle: { fontSize: 18, fontWeight: '800', marginBottom: space.sm },
   emptyHint: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
   cardBlock: { marginBottom: space.xl },

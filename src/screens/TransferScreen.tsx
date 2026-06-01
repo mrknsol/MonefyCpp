@@ -13,11 +13,9 @@ import {
 
 import { AnimatedPressable, animateNextLayout } from '../components/AnimatedPressable';
 import { useAppPreferences } from '../context/AppPreferencesContext';
-import { useAuth } from '../context/AuthContext';
 import { useSecurity } from '../context/SecurityContext';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { MonefyCore, parseJson } from '../native/monefyCore';
-import { recordRecentPayment } from '../services/recentPayments';
 import type { Card } from '../types';
 import { cardShadow, radii, space } from '../theme/tokens';
 import { formatCardNumber, normalizeCardNumber } from '../utils/cardNumber';
@@ -34,7 +32,6 @@ type RecipientLookup = {
 export function TransferScreen({ navigation, route }: Props) {
   const { colors, t } = useAppPreferences();
   const { requirePaymentAuth } = useSecurity();
-  const { user } = useAuth();
   const [mode, setMode] = useState<TransferMode>('own');
   const [cards, setCards] = useState<Card[]>([]);
   const [fromCard, setFromCard] = useState<Card | null>(null);
@@ -122,9 +119,6 @@ export function TransferScreen({ navigation, route }: Props) {
         amt,
         description.trim() || t('transferDefaultDesc'),
       );
-      if (user?.id) {
-        await recordRecentPayment(user.id, 'transfer');
-      }
       navigation.goBack();
     } catch (e: unknown) {
       Alert.alert(t('error'), e instanceof Error ? e.message : String(e));
@@ -176,9 +170,6 @@ export function TransferScreen({ navigation, route }: Props) {
         amt,
         transferDescription,
       );
-      if (user?.id) {
-        await recordRecentPayment(user.id, 'transfer');
-      }
       Alert.alert(
         t('transferSuccess'),
         t('transferSuccessPerson', { name: recipientName }),

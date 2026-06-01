@@ -11,8 +11,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnimatedPressable, animateNextLayout } from '../components/AnimatedPressable';
+import { AppIcon } from '../components/AppIcon';
 import { DecorBackdrop } from '../components/DecorBackdrop';
-import { categoryGlyph } from '../constants/categoryGlyphs';
+import { categoryIconName } from '../constants/categoryGlyphs';
 import { useAppPreferences } from '../context/AppPreferencesContext';
 import { resolveCategoryLabel } from '../i18n/translations';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -316,7 +317,7 @@ export function HomeScreen({ navigation }: Props) {
             ) : (
               totals.map(row => {
                 const label = resolveCategoryLabel(row.category, locale, customCats);
-                const glyph = categoryGlyph(row.iconName || 'Custom');
+                const iconName = categoryIconName(row.iconName || 'Custom');
                 const pct = Math.min(100, (row.amount / maxSlice) * 100);
                 return (
                   <View
@@ -331,7 +332,12 @@ export function HomeScreen({ navigation }: Props) {
                         styles.catIconRing,
                         { borderColor: row.iconColor, backgroundColor: colors.cardElevated },
                       ]}>
-                      <Text style={styles.catGlyph}>{glyph}</Text>
+                      <AppIcon
+                        name={iconName}
+                        color={row.iconColor}
+                        backgroundColor={colors.cardElevated}
+                        size={38}
+                      />
                     </View>
                     <View style={styles.catBody}>
                       <Text style={[styles.catName, { color: colors.text }]} numberOfLines={1}>
@@ -365,7 +371,7 @@ export function HomeScreen({ navigation }: Props) {
             ) : (
               transactions.map((item, idx) => {
                 const catLabel = resolveCategoryLabel(item.category, locale, customCats);
-                const g = categoryGlyph(item.iconName || 'Custom');
+                const iconName = categoryIconName(item.iconName || 'Custom');
                 const last = idx === transactions.length - 1;
                 return (
                   <AnimatedPressable
@@ -382,7 +388,12 @@ export function HomeScreen({ navigation }: Props) {
                       cardShadow(false),
                     ]}>
                     <View style={[styles.txAccent, { backgroundColor: colors.expense }]} />
-                    <Text style={styles.txGlyph}>{g}</Text>
+                    <AppIcon
+                      name={iconName}
+                      color={colors.expense}
+                      backgroundColor={colors.chip}
+                      size={34}
+                    />
                     <View style={styles.txMid}>
                       <Text style={[styles.txCat, { color: colors.text }]}>{catLabel}</Text>
                       <Text

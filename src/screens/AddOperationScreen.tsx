@@ -12,14 +12,13 @@ import {
 } from 'react-native';
 
 import { AnimatedPressable } from '../components/AnimatedPressable';
-import { categoryGlyph } from '../constants/categoryGlyphs';
+import { AppIcon } from '../components/AppIcon';
+import { categoryIconName } from '../constants/categoryGlyphs';
 import { TOP_UP_CATEGORY } from '../constants/banking';
 import { useAppPreferences } from '../context/AppPreferencesContext';
-import { useAuth } from '../context/AuthContext';
 import { useSecurity } from '../context/SecurityContext';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { MonefyCore } from '../native/monefyCore';
-import { recordRecentPayment } from '../services/recentPayments';
 import type { Card, UiCategory } from '../types';
 import { cardShadow, radii, space } from '../theme/tokens';
 import { loadCustomCategories, mergeUiCategories } from '../utils/categories';
@@ -29,7 +28,6 @@ type Props = NativeStackScreenProps<RootStackParamList, 'AddOperation'>;
 export function AddOperationScreen({ navigation, route }: Props) {
   const { colors, t, locale } = useAppPreferences();
   const { requirePaymentAuth } = useSecurity();
-  const { user } = useAuth();
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
@@ -128,14 +126,8 @@ export function AddOperationScreen({ navigation, route }: Props) {
 
       if (isIncome) {
         await MonefyCore.addIncomeJson(payload);
-        if (user?.id) {
-          await recordRecentPayment(user.id, 'topup');
-        }
       } else {
         await MonefyCore.addExpenseJson(payload);
-        if (user?.id) {
-          await recordRecentPayment(user.id, 'expense');
-        }
       }
       navigation.goBack();
     } catch (e: unknown) {
@@ -159,7 +151,13 @@ export function AddOperationScreen({ navigation, route }: Props) {
         contentContainerStyle={{ paddingBottom: space.xxl }}>
         {isIncome ? (
           <View style={[styles.topUpBanner, { backgroundColor: colors.brandSoft }]}>
-            <Text style={styles.topUpGlyph}>{categoryGlyph('TopUp')}</Text>
+            <AppIcon
+              name="topup"
+              color={colors.income}
+              backgroundColor={colors.card}
+              size={48}
+              style={styles.topUpGlyph}
+            />
             <View style={styles.topUpTextWrap}>
               <Text style={[styles.topUpTitle, { color: colors.brand }]}>
                 {t('topUpLabel')}
@@ -189,9 +187,13 @@ export function AddOperationScreen({ navigation, route }: Props) {
                     },
                   ]}
                   onPress={() => setSelectedCategory(category)}>
-                  <Text style={styles.categoryGlyph}>
-                    {categoryGlyph(category.iconName)}
-                  </Text>
+                  <AppIcon
+                    name={categoryIconName(category.iconName)}
+                    color={category.color}
+                    backgroundColor={colors.chip}
+                    size={38}
+                    style={styles.categoryGlyph}
+                  />
                   <Text
                     style={[
                       styles.categoryLabel,
@@ -337,7 +339,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.lg,
     gap: space.md,
   },
-  topUpGlyph: { fontSize: 36 },
+  topUpGlyph: {},
   topUpTextWrap: { flex: 1 },
   topUpTitle: { fontSize: 18, fontWeight: '800' },
   topUpHint: { fontSize: 14, marginTop: 4 },
@@ -367,7 +369,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...cardShadow(false),
   },
-  categoryGlyph: { fontSize: 24, marginBottom: space.xs },
+  categoryGlyph: { marginBottom: space.xs },
   categoryLabel: { fontSize: 12, fontWeight: '600', textAlign: 'center' },
   saveButton: {
     borderRadius: radii.lg,

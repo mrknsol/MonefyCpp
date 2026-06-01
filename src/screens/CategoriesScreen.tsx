@@ -9,7 +9,8 @@ import {
 } from 'react-native';
 
 import { AnimatedPressable, animateNextLayout } from '../components/AnimatedPressable';
-import { categoryGlyph } from '../constants/categoryGlyphs';
+import { AppIcon } from '../components/AppIcon';
+import { categoryIconName } from '../constants/categoryGlyphs';
 import { useAppPreferences } from '../context/AppPreferencesContext';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { MonefyCore, parseJson } from '../native/monefyCore';
@@ -141,7 +142,13 @@ export function CategoriesScreen({ navigation, route }: Props) {
                 cardShadow(false),
               ]}
               onPress={() => pickExpense(cat)}>
-              <Text style={styles.tileGlyph}>{categoryGlyph(cat.iconName)}</Text>
+              <AppIcon
+                name={categoryIconName(cat.iconName)}
+                color={cat.color}
+                backgroundColor={colors.chip}
+                size={44}
+                style={styles.tileGlyph}
+              />
               <Text style={[styles.tileTxt, { color: colors.text }]} numberOfLines={2}>
                 {cat.label}
               </Text>
@@ -198,7 +205,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     alignItems: 'center',
   },
-  tileGlyph: { fontSize: 32, marginBottom: space.sm },
+  tileGlyph: { marginBottom: space.sm },
   tileTxt: { textAlign: 'center', fontWeight: '700', fontSize: 13 },
   incomeList: { gap: space.md },
   cardRow: {

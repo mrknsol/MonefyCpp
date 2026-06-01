@@ -1,24 +1,25 @@
-/** Emoji fallback for WPF-style icon names (no extra icon font dependency). */
-const GLYPHS: Record<string, string> = {
-  Dog: '🐕',
-  Phone: '📱',
-  Restaurant: '🍽️',
-  Car: '🚕',
-  ClothesHanger: '👔',
-  Beverages: '🥤',
-  Transportation: '🚌',
-  Home: '🏠',
-  OralHygiene: '🧴',
-  YoutubeSports: '⚽',
-  Gift: '🎁',
-  HealthPotion: '💊',
-  CarRepair: '🔧',
-  Marketplace: '🛒',
-  Custom: '✨',
-  TopUp: '💰',
-  Transfer: '↔️',
+import type { AppIconName } from '../components/AppIcon';
+
+const ICONS: Record<string, AppIconName> = {
+  Dog: 'pets',
+  Phone: 'phone',
+  Restaurant: 'restaurant',
+  Car: 'taxi',
+  ClothesHanger: 'clothes',
+  Beverages: 'beverages',
+  Transportation: 'transport',
+  Home: 'home',
+  OralHygiene: 'hygiene',
+  YoutubeSports: 'sport',
+  Gift: 'gift',
+  HealthPotion: 'health',
+  CarRepair: 'carRepair',
+  Marketplace: 'market',
+  Custom: 'custom',
+  TopUp: 'topup',
+  Transfer: 'transfer',
 };
 
-export function categoryGlyph(iconName: string): string {
-  return GLYPHS[iconName] ?? '📌';
+export function categoryIconName(iconName: string): AppIconName {
+  return ICONS[iconName] ?? 'custom';
 }

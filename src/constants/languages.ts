@@ -15,6 +15,7 @@ export const APP_LANGUAGES: LanguageOption[] = [
   { code: 'es', nativeName: 'Español' },
   { code: 'tr', nativeName: 'Türkçe' },
   { code: 'zh', nativeName: '中文' },
+  { code: 'id', nativeName: 'Bahasa Indonesia' },
 ];
 
 export function languageNativeName(code: AppLocale): string {

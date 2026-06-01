@@ -1,14 +1,23 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import type { PaymentActionId } from '../utils/paymentActions';
+import { isServicePaymentId, type ServicePaymentId } from '../constants/servicePayments';
 
 const STORAGE_PREFIX = 'recent_payments';
 const MAX_ITEMS = 5;
 
 export type RecentPayment = {
-  id: PaymentActionId;
+  kind: 'service';
+  id: ServicePaymentId;
+  usedAt: string;
+} | {
+  kind: 'custom';
+  id: string;
   usedAt: string;
 };
+
+export type RecentPaymentTarget =
+  | { kind: 'service'; id: ServicePaymentId }
+  | { kind: 'custom'; id: string };
 
 function storageKey(userId: string) {
   return `${STORAGE_PREFIX}_${userId}`;
@@ -16,17 +25,38 @@ function storageKey(userId: string) {
 
 export async function recordRecentPayment(
   userId: string,
-  id: PaymentActionId,
+  target: RecentPaymentTarget,
 ): Promise<void> {
   const key = storageKey(userId);
   const raw = await AsyncStorage.getItem(key);
-  let list: RecentPayment[] = raw ? (JSON.parse(raw) as RecentPayment[]) : [];
-  list = list.filter(item => item.id !== id);
-  list.unshift({ id, usedAt: new Date().toISOString() });
+  let list = raw ? normalizeRecentPayments(JSON.parse(raw) as unknown[]) : [];
+  list = list.filter(item => item.kind !== target.kind || item.id !== target.id);
+  list.unshift({ ...target, usedAt: new Date().toISOString() });
   await AsyncStorage.setItem(key, JSON.stringify(list.slice(0, MAX_ITEMS)));
 }
 
 export async function getRecentPayments(userId: string): Promise<RecentPayment[]> {
   const raw = await AsyncStorage.getItem(storageKey(userId));
-  return raw ? (JSON.parse(raw) as RecentPayment[]) : [];
+  return raw ? normalizeRecentPayments(JSON.parse(raw) as unknown[]) : [];
+}
+
+function normalizeRecentPayments(rawList: unknown[]): RecentPayment[] {
+  return rawList.flatMap<RecentPayment>(item => {
+    if (!item || typeof item !== 'object') {
+      return [];
+    }
+    const candidate = item as { kind?: unknown; id?: unknown; usedAt?: unknown };
+    const usedAt = typeof candidate.usedAt === 'string' ? candidate.usedAt : new Date().toISOString();
+
+    if (candidate.kind === 'custom' && typeof candidate.id === 'string') {
+      return [{ kind: 'custom', id: candidate.id, usedAt }];
+    }
+    if (candidate.kind === 'service' && typeof candidate.id === 'string' && isServicePaymentId(candidate.id)) {
+      return [{ kind: 'service', id: candidate.id, usedAt }];
+    }
+    if (typeof candidate.id === 'string' && isServicePaymentId(candidate.id)) {
+      return [{ kind: 'service', id: candidate.id, usedAt }];
+    }
+    return [];
+  });
 }

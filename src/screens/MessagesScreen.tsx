@@ -4,6 +4,7 @@ import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
 import { AnimatedPressable } from '../components/AnimatedPressable';
+import { AppIcon, type AppIconName } from '../components/AppIcon';
 import { useAppPreferences } from '../context/AppPreferencesContext';
 import { useAuth } from '../context/AuthContext';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -13,10 +14,10 @@ import { formatDayForPreferences } from '../utils/date';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Messages'>;
 
-const TYPE_GLYPH: Record<AppMessage['type'], string> = {
-  info: 'ℹ️',
-  security: '🔒',
-  promo: '🎁',
+const TYPE_ICON: Record<AppMessage['type'], AppIconName> = {
+  info: 'info',
+  security: 'security',
+  promo: 'promo',
 };
 
 export function MessagesScreen({ navigation }: Props) {
@@ -71,7 +72,13 @@ export function MessagesScreen({ navigation }: Props) {
             },
             cardShadow(false),
           ]}>
-          <Text style={styles.glyph}>{TYPE_GLYPH[item.type]}</Text>
+          <AppIcon
+            name={TYPE_ICON[item.type]}
+            color={item.read ? colors.textMuted : colors.brand}
+            backgroundColor={colors.chip}
+            size={34}
+            style={styles.glyph}
+          />
           <View style={styles.mid}>
             <Text
               style={[
@@ -105,7 +112,7 @@ const styles = StyleSheet.create({
     padding: space.md,
     marginBottom: space.sm,
   },
-  glyph: { fontSize: 22, width: 36, textAlign: 'center' },
+  glyph: { marginRight: space.sm },
   mid: { flex: 1 },
   title: { fontSize: 15 },
   date: { fontSize: 12, marginTop: 4, fontWeight: '600' },
