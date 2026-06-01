@@ -2,13 +2,13 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import {
   Alert,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 
+import { AnimatedPressable, animateNextLayout } from '../components/AnimatedPressable';
 import { categoryGlyph } from '../constants/categoryGlyphs';
 import { useAppPreferences } from '../context/AppPreferencesContext';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -79,7 +79,8 @@ export function CategoriesScreen({ navigation, route }: Props) {
       style={{ backgroundColor: colors.background }}
       contentContainerStyle={styles.wrap}>
       <View style={styles.tabs}>
-        <Pressable
+        <AnimatedPressable
+          variant="soft"
           style={[
             styles.tab,
             {
@@ -88,7 +89,10 @@ export function CategoriesScreen({ navigation, route }: Props) {
             },
             cardShadow(false),
           ]}
-          onPress={() => setMode('expense')}>
+          onPress={() => {
+            animateNextLayout();
+            setMode('expense');
+          }}>
           <Text
             style={[
               styles.tabTxt,
@@ -96,8 +100,9 @@ export function CategoriesScreen({ navigation, route }: Props) {
             ]}>
             {t('expensesTab')}
           </Text>
-        </Pressable>
-        <Pressable
+        </AnimatedPressable>
+        <AnimatedPressable
+          variant="soft"
           style={[
             styles.tab,
             {
@@ -106,7 +111,10 @@ export function CategoriesScreen({ navigation, route }: Props) {
             },
             cardShadow(false),
           ]}
-          onPress={() => setMode('income')}>
+          onPress={() => {
+            animateNextLayout();
+            setMode('income');
+          }}>
           <Text
             style={[
               styles.tabTxt,
@@ -114,7 +122,7 @@ export function CategoriesScreen({ navigation, route }: Props) {
             ]}>
             {t('topUpTab')}
           </Text>
-        </Pressable>
+        </AnimatedPressable>
       </View>
 
       <Text style={[styles.sum, { color: colors.text }]}>
@@ -124,8 +132,9 @@ export function CategoriesScreen({ navigation, route }: Props) {
       {mode === 'expense' ? (
         <View style={styles.grid}>
           {uiCats.map(cat => (
-            <Pressable
+            <AnimatedPressable
               key={cat.id}
+              variant="tile"
               style={[
                 styles.tile,
                 { borderColor: cat.color, backgroundColor: colors.card },
@@ -136,7 +145,7 @@ export function CategoriesScreen({ navigation, route }: Props) {
               <Text style={[styles.tileTxt, { color: colors.text }]} numberOfLines={2}>
                 {cat.label}
               </Text>
-            </Pressable>
+            </AnimatedPressable>
           ))}
         </View>
       ) : (
@@ -145,8 +154,9 @@ export function CategoriesScreen({ navigation, route }: Props) {
             <Text style={[styles.hint, { color: colors.topup }]}>{t('noCardsForTopup')}</Text>
           ) : (
             cards.map(card => (
-              <Pressable
+              <AnimatedPressable
                 key={card.number}
+                variant="tile"
                 style={[
                   styles.cardRow,
                   { backgroundColor: colors.card, borderColor: colors.border },
@@ -157,7 +167,7 @@ export function CategoriesScreen({ navigation, route }: Props) {
                 <Text style={[styles.cardBal, { color: colors.income }]}>
                   {card.balance.toFixed(2)}
                 </Text>
-              </Pressable>
+              </AnimatedPressable>
             ))
           )}
         </View>

@@ -2,12 +2,12 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useLayoutEffect, useState } from 'react';
 import {
   Alert,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
 } from 'react-native';
 
+import { AnimatedPressable } from '../components/AnimatedPressable';
 import { categoryGlyph } from '../constants/categoryGlyphs';
 import { useAppPreferences } from '../context/AppPreferencesContext';
 import { resolveCategoryLabel } from '../i18n/translations';
@@ -73,8 +73,9 @@ export function PayScreen({ navigation, route }: Props) {
         {glyph} {amount.toFixed(2)} · {catTitle}
       </Text>
       {cards.map(c => (
-        <Pressable
+        <AnimatedPressable
           key={c.number}
+          variant="tile"
           style={[
             styles.row,
             { backgroundColor: colors.card, borderColor: colors.border },
@@ -84,7 +85,7 @@ export function PayScreen({ navigation, route }: Props) {
           <Text style={[styles.bal, { color: colors.income }]}>
             {c.balance.toFixed(2)}
           </Text>
-        </Pressable>
+        </AnimatedPressable>
       ))}
       {cards.length === 0 ? (
         <Text style={[styles.warn, { color: colors.danger }]}>{t('noCardsWarn')}</Text>

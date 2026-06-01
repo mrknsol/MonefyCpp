@@ -4,11 +4,11 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AnimatedPressable } from '../components/AnimatedPressable';
 import { useAppPreferences } from '../context/AppPreferencesContext';
 import { useAuth } from '../context/AuthContext';
 import { cardShadow, radii, space } from '../theme/tokens';
@@ -97,6 +97,10 @@ export function RegisterScreen({ onLogin }: { onLogin: () => void }) {
           placeholderTextColor={colors.textMuted}
           value={password}
           onChangeText={setPassword}
+          autoComplete="off"
+          importantForAutofill="no"
+          textContentType="none"
+          passwordRules=""
           secureTextEntry
         />
         <TextInput
@@ -108,21 +112,26 @@ export function RegisterScreen({ onLogin }: { onLogin: () => void }) {
           placeholderTextColor={colors.textMuted}
           value={confirmPassword}
           onChangeText={setConfirmPassword}
+          autoComplete="off"
+          importantForAutofill="no"
+          textContentType="none"
+          passwordRules=""
           secureTextEntry
         />
 
-        <TouchableOpacity
+        <AnimatedPressable
+          variant="primary"
           style={[styles.button, { backgroundColor: colors.brand }]}
           onPress={handleRegister}
           disabled={isLoading}>
           <Text style={[styles.buttonText, { color: colors.inverseText }]}>
             {isLoading ? t('saving') : t('signUpLink')}
           </Text>
-        </TouchableOpacity>
+        </AnimatedPressable>
 
-        <TouchableOpacity style={styles.footer} onPress={onLogin}>
+        <AnimatedPressable variant="soft" style={styles.footer} onPress={onLogin}>
           <Text style={[styles.link, { color: colors.brand }]}>{t('signIn')}</Text>
-        </TouchableOpacity>
+        </AnimatedPressable>
       </View>
     </View>
   );

@@ -1,9 +1,9 @@
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import Clipboard from '@react-native-clipboard/clipboard';
 import React, { useCallback, useLayoutEffect, useMemo, useState } from 'react';
 import {
   Alert,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,19 +11,25 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AnimatedPressable } from '../components/AnimatedPressable';
 import { BankCardVisual } from '../components/BankCardVisual';
 import { useAppPreferences } from '../context/AppPreferencesContext';
+import { useSecurity } from '../context/SecurityContext';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { MonefyCore, parseJson } from '../native/monefyCore';
 import type { Card } from '../types';
 import { cardShadow, radii, space } from '../theme/tokens';
+import { cardThemeForIndex } from '../utils/cardThemes';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Cards'>;
 
 export function CardsScreen({ navigation }: Props) {
   const { colors, t } = useAppPreferences();
+  const { requirePaymentAuth } = useSecurity();
   const insets = useSafeAreaInsets();
   const [cards, setCards] = useState<Card[]>([]);
+  const [flippedCardNumber, setFlippedCardNumber] = useState<string | null>(null);
+  const [cvvVisibleCardNumber, setCvvVisibleCardNumber] = useState<string | null>(null);
 
   useLayoutEffect(() => {
     navigation.setOptions({ title: t('navCards'), headerShown: false });
@@ -63,6 +69,11 @@ export function CardsScreen({ navigation }: Props) {
     ]);
   };
 
+  const copyCardNumber = (number: string) => {
+    Clipboard.setString(number);
+    Alert.alert(t('cardNumberCopied'));
+  };
+
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <ScrollView
@@ -75,10 +86,25 @@ export function CardsScreen({ navigation }: Props) {
           },
         ]}>
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>{t('myCards')}</Text>
-          <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-            {cards.length} {t('cardsCount')} · {totalBalance.toFixed(2)} ₽
-          </Text>
+          <View style={styles.headerTop}>
+            <AnimatedPressable
+              accessibilityRole="button"
+              accessibilityLabel="Back"
+              onPress={() => navigation.goBack()}
+              variant="icon"
+              style={[
+                styles.backBtn,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}>
+              <Text style={[styles.backTxt, { color: colors.text }]}>‹</Text>
+            </AnimatedPressable>
+            <View style={styles.headerText}>
+              <Text style={[styles.title, { color: colors.text }]}>{t('myCards')}</Text>
+              <Text style={[styles.subtitle, { color: colors.textMuted }]}>
+                {cards.length} {t('cardsCount')} · {totalBalance.toFixed(2)} ₽
+              </Text>
+            </View>
+          </View>
         </View>
 
         {cards.length === 0 ? (
@@ -94,46 +120,47 @@ export function CardsScreen({ navigation }: Props) {
             </Text>
           </View>
         ) : (
-          cards.map(card => (
+          cards.map((card, index) => (
             <View key={card.number} style={styles.cardBlock}>
-              <BankCardVisual
-                card={card}
-                balance={card.balance}
-                colors={colors}
-                label={`${card.name} ${card.surname}`.trim()}
-              />
-              <View
-                style={[
-                  styles.metaRow,
-                  { backgroundColor: colors.card, borderColor: colors.border },
-                  cardShadow(false),
-                ]}>
-                <View>
-                  <Text style={[styles.metaLabel, { color: colors.textMuted }]}>
-                    {t('cardNumber')}
-                  </Text>
-                  <Text style={[styles.metaValue, { color: colors.text }]}>{card.number}</Text>
-                </View>
-                <View style={styles.metaRight}>
-                  <Text style={[styles.metaLabel, { color: colors.textMuted }]}>
-                    {t('until')}
-                  </Text>
-                  <Text style={[styles.metaValue, { color: colors.text }]}>
-                    {card.monthOfExpiry}/{card.yearOfExpiry}
-                  </Text>
-                </View>
-              </View>
+              <AnimatedPressable
+                variant="tile"
+                onPress={() =>
+                  setFlippedCardNumber(prev => (prev === card.number ? null : card.number))
+                }>
+                <BankCardVisual
+                  card={card}
+                  balance={card.balance}
+                  colors={colors}
+                  label={`${card.name} ${card.surname}`.trim()}
+                  theme={cardThemeForIndex(index)}
+                  flipped={flippedCardNumber === card.number}
+                  showCvv={cvvVisibleCardNumber === card.number}
+                  onCopyNumber={() => copyCardNumber(card.number)}
+                  onToggleCvv={() =>
+                    setCvvVisibleCardNumber(prev => (prev === card.number ? null : card.number))
+                  }
+                  copyLabel={t('copyCardNumber')}
+                  showCvvLabel={t('showCvv')}
+                  hideCvvLabel={t('hideCvv')}
+                />
+              </AnimatedPressable>
               <View style={styles.actions}>
-                <Pressable
+                <AnimatedPressable
+                  variant="primary"
                   style={[styles.actionBtn, { backgroundColor: colors.brandSoft }]}
-                  onPress={() => navigation.navigate('EditCard', { card })}>
+                  onPress={() =>
+                    requirePaymentAuth(() =>
+                      navigation.navigate('EditCard', { card }),
+                    )
+                  }>
                   <Text style={[styles.actionTxt, { color: colors.brand }]}>{t('edit')}</Text>
-                </Pressable>
-                <Pressable
+                </AnimatedPressable>
+                <AnimatedPressable
+                  variant="primary"
                   style={[styles.actionBtn, { backgroundColor: colors.chip }]}
                   onPress={() => remove(card.number)}>
                   <Text style={[styles.actionTxt, { color: colors.expense }]}>{t('remove')}</Text>
-                </Pressable>
+                </AnimatedPressable>
               </View>
             </View>
           ))
@@ -149,15 +176,16 @@ export function CardsScreen({ navigation }: Props) {
             borderTopColor: colors.border,
           },
         ]}>
-        <Pressable
+        <AnimatedPressable
           onPress={() => navigation.navigate('AddCard')}
-          style={({ pressed }) => [
+          variant="primary"
+          style={[
             styles.addBtn,
-            { backgroundColor: colors.brand, opacity: pressed ? 0.92 : 1 },
+            { backgroundColor: colors.brand },
             cardShadow(true),
           ]}>
           <Text style={[styles.addBtnTxt, { color: colors.inverseText }]}>+ {t('addCard')}</Text>
-        </Pressable>
+        </AnimatedPressable>
       </View>
     </View>
   );
@@ -167,6 +195,17 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   scroll: { paddingHorizontal: space.lg },
   header: { marginBottom: space.lg },
+  headerTop: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  headerText: { flex: 1 },
+  backBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backTxt: { fontSize: 34, fontWeight: '600', marginTop: -2 },
   title: { fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
   subtitle: { fontSize: 14, fontWeight: '600', marginTop: space.xs },
   emptyBox: {
@@ -179,17 +218,6 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 18, fontWeight: '800', marginBottom: space.sm },
   emptyHint: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
   cardBlock: { marginBottom: space.xl },
-  metaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderRadius: radii.lg,
-    padding: space.md,
-    marginTop: space.sm,
-  },
-  metaLabel: { fontSize: 11, fontWeight: '600', marginBottom: 4 },
-  metaValue: { fontSize: 14, fontWeight: '700' },
-  metaRight: { alignItems: 'flex-end' },
   actions: {
     flexDirection: 'row',
     gap: space.sm,

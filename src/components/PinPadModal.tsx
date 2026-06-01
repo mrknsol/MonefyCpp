@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import {
   Modal,
-  Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AnimatedPressable } from './AnimatedPressable';
 import { useAppPreferences } from '../context/AppPreferencesContext';
 import { radii, space } from '../theme/tokens';
 
@@ -68,9 +68,9 @@ export function PinPadModal({ visible, mode, pinLength, onClose, onComplete }: P
       <View style={[styles.overlay, { backgroundColor: 'rgba(6, 13, 24, 0.92)' }]}>
         <View style={[styles.sheet, { paddingBottom: insets.bottom + space.lg }]}>
           <View style={styles.handleRow}>
-            <Pressable onPress={onClose} hitSlop={12}>
+            <AnimatedPressable variant="soft" onPress={onClose} hitSlop={12}>
               <Text style={[styles.close, { color: colors.textMuted }]}>{t('cancel')}</Text>
-            </Pressable>
+            </AnimatedPressable>
           </View>
 
           <Text style={[styles.title, { color: colors.inverseText }]}>{title}</Text>
@@ -102,8 +102,9 @@ export function PinPadModal({ visible, mode, pinLength, onClose, onComplete }: P
 
           <View style={styles.pad}>
             {KEYS.map((key, idx) => (
-              <Pressable
+              <AnimatedPressable
                 key={`${key}-${idx}`}
+                variant="icon"
                 style={[
                   styles.key,
                   !key && styles.keyEmpty,
@@ -114,7 +115,7 @@ export function PinPadModal({ visible, mode, pinLength, onClose, onComplete }: P
                 <Text style={[styles.keyText, { color: colors.inverseText }]}>
                   {key}
                 </Text>
-              </Pressable>
+              </AnimatedPressable>
             ))}
           </View>
         </View>

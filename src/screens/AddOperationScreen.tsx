@@ -4,7 +4,6 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,12 +11,15 @@ import {
   View,
 } from 'react-native';
 
+import { AnimatedPressable } from '../components/AnimatedPressable';
 import { categoryGlyph } from '../constants/categoryGlyphs';
 import { TOP_UP_CATEGORY } from '../constants/banking';
 import { useAppPreferences } from '../context/AppPreferencesContext';
+import { useAuth } from '../context/AuthContext';
 import { useSecurity } from '../context/SecurityContext';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { MonefyCore } from '../native/monefyCore';
+import { recordRecentPayment } from '../services/recentPayments';
 import type { Card, UiCategory } from '../types';
 import { cardShadow, radii, space } from '../theme/tokens';
 import { loadCustomCategories, mergeUiCategories } from '../utils/categories';
@@ -27,6 +29,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'AddOperation'>;
 export function AddOperationScreen({ navigation, route }: Props) {
   const { colors, t, locale } = useAppPreferences();
   const { requirePaymentAuth } = useSecurity();
+  const { user } = useAuth();
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
@@ -36,6 +39,8 @@ export function AddOperationScreen({ navigation, route }: Props) {
   const [isLoading, setIsLoading] = useState(false);
 
   const operationType = route.params?.type || 'expense';
+  const presetCategoryId = route.params?.categoryId;
+  const presetDescription = route.params?.description ?? '';
   const isIncome = operationType === 'income';
 
   const loadCards = React.useCallback(async () => {
@@ -59,13 +64,16 @@ export function AddOperationScreen({ navigation, route }: Props) {
       const customCategories = await loadCustomCategories();
       const allCategories = mergeUiCategories(customCategories, locale);
       setCategories(allCategories);
-      if (allCategories.length > 0 && !selectedCategory) {
-        setSelectedCategory(allCategories[0]);
+      if (allCategories.length > 0) {
+        const preset = presetCategoryId
+          ? allCategories.find(c => c.id === presetCategoryId)
+          : null;
+        setSelectedCategory(prev => preset ?? prev ?? allCategories[0]);
       }
     } catch (e) {
       console.error('Failed to load categories:', e);
     }
-  }, [selectedCategory, locale, isIncome]);
+  }, [presetCategoryId, locale, isIncome]);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -77,6 +85,12 @@ export function AddOperationScreen({ navigation, route }: Props) {
     loadCards();
     loadCategories();
   }, [loadCards, loadCategories]);
+
+  React.useEffect(() => {
+    if (presetDescription) {
+      setDescription(presetDescription);
+    }
+  }, [presetDescription]);
 
   const performSave = async () => {
     const amt = parseFloat(amount.replace(',', '.'));
@@ -114,8 +128,14 @@ export function AddOperationScreen({ navigation, route }: Props) {
 
       if (isIncome) {
         await MonefyCore.addIncomeJson(payload);
+        if (user?.id) {
+          await recordRecentPayment(user.id, 'topup');
+        }
       } else {
         await MonefyCore.addExpenseJson(payload);
+        if (user?.id) {
+          await recordRecentPayment(user.id, 'expense');
+        }
       }
       navigation.goBack();
     } catch (e: unknown) {
@@ -154,8 +174,9 @@ export function AddOperationScreen({ navigation, route }: Props) {
             <Text style={[styles.label, { color: colors.text }]}>{t('selectCategory')}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {categories.map(category => (
-                <Pressable
+                <AnimatedPressable
                   key={category.id}
+                  variant="tile"
                   style={[
                     styles.categoryOption,
                     {
@@ -183,7 +204,7 @@ export function AddOperationScreen({ navigation, route }: Props) {
                     ]}>
                     {category.label}
                   </Text>
-                </Pressable>
+                </AnimatedPressable>
               ))}
             </ScrollView>
           </View>
@@ -192,7 +213,8 @@ export function AddOperationScreen({ navigation, route }: Props) {
         <View style={styles.section}>
           <Text style={[styles.label, { color: colors.text }]}>{t('selectCard')}</Text>
           {cards.length === 0 ? (
-            <Pressable
+            <AnimatedPressable
+              variant="tile"
               style={[
                 styles.noCardsCard,
                 { backgroundColor: colors.card, borderColor: colors.border },
@@ -201,12 +223,13 @@ export function AddOperationScreen({ navigation, route }: Props) {
               <Text style={[styles.noCardsText, { color: colors.textMuted }]}>
                 {t('noCardsForTopup')}
               </Text>
-            </Pressable>
+            </AnimatedPressable>
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {cards.map(card => (
-                <Pressable
+                <AnimatedPressable
                   key={card.number}
+                  variant="tile"
                   style={[
                     styles.cardOption,
                     {
@@ -223,7 +246,7 @@ export function AddOperationScreen({ navigation, route }: Props) {
                   <Text style={[styles.cardBalance, { color: colors.textMuted }]}>
                     {card.balance.toFixed(2)} ₽
                   </Text>
-                </Pressable>
+                </AnimatedPressable>
               ))}
             </ScrollView>
           )}
@@ -272,7 +295,8 @@ export function AddOperationScreen({ navigation, route }: Props) {
           />
         </View>
 
-        <Pressable
+        <AnimatedPressable
+          variant="primary"
           style={[
             styles.saveButton,
             {
@@ -288,7 +312,7 @@ export function AddOperationScreen({ navigation, route }: Props) {
           <Text style={[styles.saveButtonText, { color: 'white' }]}>
             {isLoading ? t('saving') : t('save')}
           </Text>
-        </Pressable>
+        </AnimatedPressable>
       </ScrollView>
     </KeyboardAvoidingView>
   );

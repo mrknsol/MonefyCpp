@@ -1,33 +1,83 @@
-import { useNavigation } from '@react-navigation/native';
-import React from 'react';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import React, { useCallback, useState } from 'react';
 import {
   Alert,
   ScrollView,
   StyleSheet,
   Switch,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AnimatedPressable } from '../components/AnimatedPressable';
+import { LanguagePicker } from '../components/LanguagePicker';
+import { ProfileAccountsSection } from '../components/ProfileAccountsSection';
+import { PhoneCountryPicker } from '../components/PhoneCountryPicker';
+import { apiUpdatePhone } from '../api/profile';
+import {
+  defaultPhoneCountry,
+  detectCountryFromPhone,
+  formatPhoneWithDial,
+  stripDialCode,
+  type PhoneCountry,
+} from '../constants/phoneCountries';
 import { useAppPreferences } from '../context/AppPreferencesContext';
 import { useAuth } from '../context/AuthContext';
 import { useSecurity } from '../context/SecurityContext';
 import { authenticateWithBiometrics } from '../services/biometrics';
+import { unreadCount } from '../services/messages';
 import { cardShadow, radii, space } from '../theme/tokens';
 
 export function ProfileScreen() {
   const { colors, t, locale, setLocale, themeMode, setThemeMode } = useAppPreferences();
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const { hasPin, faceIdEnabled, setFaceIdEnabled, biometricKind } = useSecurity();
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
+  const [phoneCountry, setPhoneCountry] = useState<PhoneCountry>(() =>
+    defaultPhoneCountry(locale),
+  );
+  const [phoneLocal, setPhoneLocal] = useState('');
+  const [isSavingPhone, setIsSavingPhone] = useState(false);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+
+  React.useEffect(() => {
+    if (!user?.phone) {
+      setPhoneCountry(defaultPhoneCountry(locale));
+      setPhoneLocal('');
+      return;
+    }
+    const country = detectCountryFromPhone(user.phone, locale);
+    setPhoneCountry(country);
+    setPhoneLocal(stripDialCode(user.phone));
+  }, [user?.phone, locale]);
+
+  const refreshUnread = useCallback(async () => {
+    if (!user?.id) {
+      setUnreadMessages(0);
+      return;
+    }
+    setUnreadMessages(await unreadCount(user.id));
+  }, [user?.id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshUnread();
+    }, [refreshUnread]),
+  );
 
   const handleLogout = () => {
     Alert.alert(t('logoutTitle'), t('logoutConfirm'), [
       { text: t('cancel'), style: 'cancel' },
       { text: t('logout'), style: 'destructive', onPress: logout },
+    ]);
+  };
+
+  const handleSwitchAccount = () => {
+    Alert.alert(t('switchAccountTitle'), t('switchAccountConfirm'), [
+      { text: t('cancel'), style: 'cancel' },
+      { text: t('switchAccount'), onPress: logout },
     ]);
   };
 
@@ -44,6 +94,25 @@ export function ProfileScreen() {
       }
     }
     await setFaceIdEnabled(value);
+  };
+
+  const savePhone = async () => {
+    const phone = formatPhoneWithDial(phoneCountry, phoneLocal);
+    if (phone.length > 0 && phone.replace(/\D/g, '').length < 10) {
+      Alert.alert(t('error'), t('phoneInvalid'));
+      return;
+    }
+
+    setIsSavingPhone(true);
+    try {
+      const updated = await apiUpdatePhone(phone);
+      await updateUser({ phone: updated.phone });
+      Alert.alert(t('phoneSaved'));
+    } catch (e: unknown) {
+      Alert.alert(t('error'), String(e));
+    } finally {
+      setIsSavingPhone(false);
+    }
   };
 
   return (
@@ -72,6 +141,90 @@ export function ProfileScreen() {
         <Text style={[styles.profileEmail, { color: 'rgba(255,255,255,0.75)' }]}>
           {user?.email}
         </Text>
+        {user?.phone ? (
+          <Text style={[styles.profilePhone, { color: 'rgba(255,255,255,0.75)' }]}>
+            {user.phone}
+          </Text>
+        ) : null}
+      </View>
+
+      <ProfileAccountsSection />
+
+      <View
+        style={[
+          styles.section,
+          { backgroundColor: colors.card, borderColor: colors.border },
+          cardShadow(false),
+        ]}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('phoneBinding')}</Text>
+        <Text style={[styles.sectionHint, { color: colors.textMuted }]}>{t('phoneBindingHint')}</Text>
+        <PhoneCountryPicker
+          colors={colors}
+          country={phoneCountry}
+          localNumber={phoneLocal}
+          onCountryChange={setPhoneCountry}
+          onLocalNumberChange={setPhoneLocal}
+          placeholder={t('phoneLocalPlaceholder')}
+          selectCountryLabel={t('selectCountry')}
+          t={t}
+        />
+        <AnimatedPressable
+          variant="primary"
+          style={[styles.savePhoneBtn, { backgroundColor: colors.brand }]}
+          onPress={savePhone}
+          disabled={isSavingPhone}>
+          <Text style={[styles.savePhoneText, { color: colors.inverseText }]}>
+            {isSavingPhone ? t('saving') : t('bindPhone')}
+          </Text>
+        </AnimatedPressable>
+      </View>
+
+      <View
+        style={[
+          styles.section,
+          { backgroundColor: colors.card, borderColor: colors.border },
+          cardShadow(false),
+        ]}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('supportTitle')}</Text>
+
+        <AnimatedPressable
+          variant="soft"
+          style={styles.settingItem}
+          onPress={() => navigation.navigate('Messages')}>
+          <View style={styles.settingLeft}>
+            <Text style={[styles.settingLabel, { color: colors.text }]}>
+              {t('messagesTitle')}
+            </Text>
+            <Text style={[styles.settingValue, { color: colors.textMuted }]}>
+              {t('messagesHint')}
+            </Text>
+          </View>
+          <View style={styles.settingRight}>
+            {unreadMessages > 0 ? (
+              <View style={[styles.badge, { backgroundColor: colors.brand }]}>
+                <Text style={[styles.badgeText, { color: colors.inverseText }]}>
+                  {unreadMessages}
+                </Text>
+              </View>
+            ) : null}
+            <Text style={[styles.chevron, { color: colors.brand }]}>›</Text>
+          </View>
+        </AnimatedPressable>
+
+        <AnimatedPressable
+          variant="soft"
+          style={styles.settingItem}
+          onPress={() => navigation.navigate('Feedback')}>
+          <View style={styles.settingLeft}>
+            <Text style={[styles.settingLabel, { color: colors.text }]}>
+              {t('feedbackTitle')}
+            </Text>
+            <Text style={[styles.settingValue, { color: colors.textMuted }]}>
+              {t('feedbackMenuHint')}
+            </Text>
+          </View>
+          <Text style={[styles.chevron, { color: colors.brand }]}>›</Text>
+        </AnimatedPressable>
       </View>
 
       <View
@@ -84,7 +237,8 @@ export function ProfileScreen() {
           {t('paymentSecurity')}
         </Text>
 
-        <TouchableOpacity
+        <AnimatedPressable
+          variant="soft"
           style={styles.settingItem}
           onPress={() => navigation.navigate('SetupPin')}>
           <View style={styles.settingLeft}>
@@ -96,7 +250,7 @@ export function ProfileScreen() {
             </Text>
           </View>
           <Text style={[styles.chevron, { color: colors.brand }]}>›</Text>
-        </TouchableOpacity>
+        </AnimatedPressable>
 
         <View style={styles.settingItem}>
           <View style={styles.settingLeft}>
@@ -127,18 +281,16 @@ export function ProfileScreen() {
         ]}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('settingsTitle')}</Text>
 
-        <TouchableOpacity
-          style={styles.settingItem}
-          onPress={() => setLocale(locale === 'ru' ? 'en' : 'ru')}>
-          <Text style={[styles.settingLabel, { color: colors.text }]}>
-            {t('languageLabel')}
-          </Text>
-          <Text style={[styles.settingValue, { color: colors.brand }]}>
-            {locale === 'ru' ? t('russian') : t('english')}
-          </Text>
-        </TouchableOpacity>
+        <LanguagePicker
+          colors={colors}
+          locale={locale}
+          onLocaleChange={setLocale}
+          label={t('languageLabel')}
+          selectTitle={t('selectLanguage')}
+        />
 
-        <TouchableOpacity
+        <AnimatedPressable
+          variant="soft"
           style={styles.settingItem}
           onPress={() => {
             const modes: Array<'light' | 'dark' | 'system'> = ['light', 'dark', 'system'];
@@ -153,14 +305,23 @@ export function ProfileScreen() {
                 ? t('themeDark')
                 : t('themeSystem')}
           </Text>
-        </TouchableOpacity>
+        </AnimatedPressable>
       </View>
 
-      <TouchableOpacity
-        style={[styles.logoutButton, { borderColor: colors.expense }]}
-        onPress={handleLogout}>
-        <Text style={[styles.logoutText, { color: colors.expense }]}>{t('logout')}</Text>
-      </TouchableOpacity>
+      <View style={styles.accountActions}>
+        <AnimatedPressable
+          variant="primary"
+          style={[styles.switchButton, { borderColor: colors.brand }]}
+          onPress={handleSwitchAccount}>
+          <Text style={[styles.switchText, { color: colors.brand }]}>{t('switchAccount')}</Text>
+        </AnimatedPressable>
+        <AnimatedPressable
+          variant="primary"
+          style={[styles.logoutButton, { borderColor: colors.expense }]}
+          onPress={handleLogout}>
+          <Text style={[styles.logoutText, { color: colors.expense }]}>{t('logout')}</Text>
+        </AnimatedPressable>
+      </View>
     </ScrollView>
   );
 }
@@ -194,6 +355,7 @@ const styles = StyleSheet.create({
   avatarText: { fontSize: 28, fontWeight: '900' },
   profileName: { fontSize: 22, fontWeight: '800' },
   profileEmail: { fontSize: 14, marginTop: space.xs },
+  profilePhone: { fontSize: 14, marginTop: 4, fontWeight: '600' },
   section: {
     borderRadius: radii.lg,
     borderWidth: 1,
@@ -201,6 +363,22 @@ const styles = StyleSheet.create({
     marginBottom: space.lg,
   },
   sectionTitle: { fontSize: 17, fontWeight: '800', marginBottom: space.md },
+  sectionHint: { fontSize: 13, marginTop: -space.sm, marginBottom: space.md, lineHeight: 18 },
+  phoneInput: {
+    borderWidth: 1,
+    borderRadius: radii.md,
+    paddingHorizontal: space.md,
+    paddingVertical: space.md,
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: space.md,
+  },
+  savePhoneBtn: {
+    borderRadius: radii.md,
+    paddingVertical: space.md,
+    alignItems: 'center',
+  },
+  savePhoneText: { fontSize: 15, fontWeight: '800' },
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -212,13 +390,30 @@ const styles = StyleSheet.create({
   settingLeft: { flex: 1, marginRight: space.md },
   settingLabel: { fontSize: 16, fontWeight: '600' },
   settingValue: { fontSize: 13, marginTop: 4 },
+  settingRight: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  badge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  badgeText: { fontSize: 11, fontWeight: '800' },
   chevron: { fontSize: 22, fontWeight: '300' },
+  accountActions: { gap: space.sm, marginTop: space.md },
+  switchButton: {
+    borderRadius: radii.lg,
+    borderWidth: 2,
+    padding: space.lg,
+    alignItems: 'center',
+  },
+  switchText: { fontSize: 16, fontWeight: '800' },
   logoutButton: {
     borderRadius: radii.lg,
     borderWidth: 2,
     padding: space.lg,
     alignItems: 'center',
-    marginTop: space.md,
   },
   logoutText: { fontSize: 16, fontWeight: '800' },
 });

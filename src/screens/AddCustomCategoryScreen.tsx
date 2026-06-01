@@ -2,7 +2,6 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useLayoutEffect, useState } from 'react';
 import {
   Alert,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,6 +9,7 @@ import {
   View,
 } from 'react-native';
 
+import { AnimatedPressable } from '../components/AnimatedPressable';
 import { EXPENSE_CATEGORIES } from '../constants/categories';
 import { categoryGlyph } from '../constants/categoryGlyphs';
 import { useAppPreferences } from '../context/AppPreferencesContext';
@@ -88,8 +88,9 @@ export function AddCustomCategoryScreen({ navigation }: Props) {
       </Text>
       <View style={styles.grid}>
         {ICON_PRESETS.map(p => (
-          <Pressable
+          <AnimatedPressable
             key={p.iconName}
+            variant="icon"
             style={[
               styles.tile,
               {
@@ -100,15 +101,16 @@ export function AddCustomCategoryScreen({ navigation }: Props) {
             ]}
             onPress={() => setPicked(p)}>
             <Text style={styles.tileGlyph}>{categoryGlyph(p.iconName)}</Text>
-          </Pressable>
+          </AnimatedPressable>
         ))}
       </View>
 
-      <Pressable
+      <AnimatedPressable
+        variant="primary"
         style={[styles.save, { backgroundColor: colors.accentMuted }]}
         onPress={save}>
         <Text style={styles.saveTxt}>{t('save')}</Text>
-      </Pressable>
+      </AnimatedPressable>
     </ScrollView>
   );
 }

@@ -2,13 +2,13 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useLayoutEffect, useState } from 'react';
 import {
   Alert,
-  Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
 
+import { AnimatedPressable } from '../components/AnimatedPressable';
 import { useAppPreferences } from '../context/AppPreferencesContext';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { cardShadow, radii, space } from '../theme/tokens';
@@ -93,40 +93,41 @@ export function CalculatorScreen({ navigation, route }: Props) {
         {KEYS.map((row, ri) => (
           <View style={styles.row} key={ri}>
             {row.map(k => (
-              <Pressable
+              <AnimatedPressable
                 key={k}
+                variant="icon"
                 onPress={() => append(k)}
-                style={({ pressed }) => [
+                style={[
                   styles.key,
                   {
                     backgroundColor: colors.card,
                     borderColor: colors.border,
-                    opacity: pressed ? 0.85 : 1,
                   },
                   cardShadow(false),
                 ]}>
                 <Text style={[styles.keyTxt, { color: colors.text }]}>{k}</Text>
-              </Pressable>
+              </AnimatedPressable>
             ))}
           </View>
         ))}
       </View>
 
       <View style={styles.bottomRow}>
-        <Pressable onPress={() => setDisplay('0')} hitSlop={12}>
+        <AnimatedPressable variant="soft" onPress={() => setDisplay('0')} hitSlop={12}>
           <Text style={[styles.clear, { color: colors.textMuted }]}>{t('reset')}</Text>
-        </Pressable>
+        </AnimatedPressable>
       </View>
 
-      <Pressable
+      <AnimatedPressable
+        variant="primary"
         onPress={next}
-        style={({ pressed }) => [
+        style={[
           styles.next,
-          { backgroundColor: colors.brand, opacity: pressed ? 0.92 : 1 },
+          { backgroundColor: colors.brand },
           cardShadow(true),
         ]}>
         <Text style={[styles.nextTxt, { color: colors.inverseText }]}>{t('nextCategory')}</Text>
-      </Pressable>
+      </AnimatedPressable>
     </View>
   );
 }

@@ -2,7 +2,6 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useLayoutEffect, useState } from 'react';
 import {
   Alert,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,10 +9,12 @@ import {
   View,
 } from 'react-native';
 
+import { AnimatedPressable } from '../components/AnimatedPressable';
 import { useAppPreferences } from '../context/AppPreferencesContext';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { MonefyCore } from '../native/monefyCore';
 import type { ThemeColors } from '../theme/colors';
+import { formatCardNumber, normalizeCardNumber } from '../utils/cardNumber';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AddCard'>;
 
@@ -33,14 +34,15 @@ export function AddCardScreen({ navigation }: Props) {
 
   const save = async () => {
     const bal = parseFloat(balance.replace(',', '.'));
-    if (!number.trim()) {
+    const normalizedNumber = normalizeCardNumber(number);
+    if (!normalizedNumber) {
       Alert.alert(t('error'), t('cardNumberRequired'));
       return;
     }
     const payload = JSON.stringify({
       name: name.trim(),
       surname: surname.trim(),
-      number: number.trim(),
+      number: normalizedNumber,
       monthOfExpiry: month.trim(),
       yearOfExpiry: year.trim(),
       cvv: cvv.trim(),
@@ -63,7 +65,7 @@ export function AddCardScreen({ navigation }: Props) {
       <Field
         label={t('cardNumber')}
         value={number}
-        onChangeText={setNumber}
+        onChangeText={value => setNumber(formatCardNumber(value))}
         keyboardType="number-pad"
         colors={colors}
       />
@@ -83,11 +85,12 @@ export function AddCardScreen({ navigation }: Props) {
         keyboardType="decimal-pad"
         colors={colors}
       />
-      <Pressable
+      <AnimatedPressable
+        variant="primary"
         style={[styles.save, { backgroundColor: colors.accentMuted }]}
         onPress={save}>
         <Text style={styles.saveTxt}>{t('save')}</Text>
-      </Pressable>
+      </AnimatedPressable>
     </ScrollView>
   );
 }

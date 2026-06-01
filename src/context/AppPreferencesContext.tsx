@@ -11,6 +11,7 @@ import { useColorScheme } from 'react-native';
 
 import type { AppLocale, DateDisplayMode, ThemeMode } from '../i18n/translations';
 import { DICT } from '../i18n/translations';
+import { isAppLocale } from '../constants/languages';
 import { darkColors, lightColors, type ThemeColors } from '../theme/colors';
 
 const KEYS = {
@@ -58,7 +59,7 @@ export function AppPreferencesProvider({
         if (cancelled) {
           return;
         }
-        if (l === 'en' || l === 'ru') {
+        if (l && isAppLocale(l)) {
           setLocaleState(l);
         }
         if (th === 'light' || th === 'dark' || th === 'system') {

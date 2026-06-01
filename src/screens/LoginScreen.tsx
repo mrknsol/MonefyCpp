@@ -4,11 +4,11 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AnimatedPressable } from '../components/AnimatedPressable';
 import { useAppPreferences } from '../context/AppPreferencesContext';
 import { useAuth } from '../context/AuthContext';
 import { cardShadow, radii, space } from '../theme/tokens';
@@ -79,21 +79,25 @@ export function LoginScreen({ onRegister }: { onRegister: () => void }) {
           placeholderTextColor={colors.textMuted}
           value={password}
           onChangeText={setPassword}
+          autoComplete="off"
+          importantForAutofill="no"
+          textContentType="none"
           secureTextEntry
         />
 
-        <TouchableOpacity
+        <AnimatedPressable
+          variant="primary"
           style={[styles.button, { backgroundColor: colors.brand }]}
           onPress={handleLogin}
           disabled={isLoading}>
           <Text style={[styles.buttonText, { color: colors.inverseText }]}>
             {isLoading ? '...' : t('signIn')}
           </Text>
-        </TouchableOpacity>
+        </AnimatedPressable>
 
-        <TouchableOpacity style={styles.footer} onPress={onRegister}>
+        <AnimatedPressable variant="soft" style={styles.footer} onPress={onRegister}>
           <Text style={[styles.link, { color: colors.brand }]}>{t('signUpLink')}</Text>
-        </TouchableOpacity>
+        </AnimatedPressable>
 
         <Text style={[styles.demo, { color: colors.textMuted }]}>
           demo@monefy.com / demo123

@@ -4,7 +4,6 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,26 +11,37 @@ import {
   View,
 } from 'react-native';
 
-import { TRANSFER_CATEGORY } from '../constants/banking';
+import { AnimatedPressable, animateNextLayout } from '../components/AnimatedPressable';
 import { useAppPreferences } from '../context/AppPreferencesContext';
+import { useAuth } from '../context/AuthContext';
 import { useSecurity } from '../context/SecurityContext';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { MonefyCore, parseJson } from '../native/monefyCore';
+import { recordRecentPayment } from '../services/recentPayments';
 import type { Card } from '../types';
 import { cardShadow, radii, space } from '../theme/tokens';
+import { formatCardNumber, normalizeCardNumber } from '../utils/cardNumber';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Transfer'>;
 type TransferMode = 'own' | 'person';
+type RecipientLookup = {
+  found: boolean;
+  firstName?: string;
+  lastName?: string;
+  maskedCardNumber?: string;
+};
 
 export function TransferScreen({ navigation, route }: Props) {
   const { colors, t } = useAppPreferences();
   const { requirePaymentAuth } = useSecurity();
+  const { user } = useAuth();
   const [mode, setMode] = useState<TransferMode>('own');
   const [cards, setCards] = useState<Card[]>([]);
   const [fromCard, setFromCard] = useState<Card | null>(null);
   const [toCard, setToCard] = useState<Card | null>(null);
-  const [recipientName, setRecipientName] = useState('');
   const [recipientAccount, setRecipientAccount] = useState('');
+  const [recipientLookup, setRecipientLookup] = useState<RecipientLookup | null>(null);
+  const [lookupLoading, setLookupLoading] = useState(false);
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
@@ -58,6 +68,32 @@ export function TransferScreen({ navigation, route }: Props) {
       }
     })();
   }, [preselected]);
+
+  useEffect(() => {
+    if (mode !== 'person') {
+      setRecipientLookup(null);
+      return;
+    }
+    const account = normalizeCardNumber(recipientAccount);
+    if (account.length < 4) {
+      setRecipientLookup(null);
+      return;
+    }
+
+    const timeout = setTimeout(async () => {
+      setLookupLoading(true);
+      try {
+        const json = await MonefyCore.lookupCard(account);
+        setRecipientLookup(parseJson<RecipientLookup>(json));
+      } catch {
+        setRecipientLookup({ found: false });
+      } finally {
+        setLookupLoading(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(timeout);
+  }, [mode, recipientAccount]);
 
   const executeOwnTransfer = async () => {
     const amt = parseFloat(amount.replace(',', '.'));
@@ -86,6 +122,9 @@ export function TransferScreen({ navigation, route }: Props) {
         amt,
         description.trim() || t('transferDefaultDesc'),
       );
+      if (user?.id) {
+        await recordRecentPayment(user.id, 'transfer');
+      }
       navigation.goBack();
     } catch (e: unknown) {
       Alert.alert(t('error'), e instanceof Error ? e.message : String(e));
@@ -96,8 +135,7 @@ export function TransferScreen({ navigation, route }: Props) {
 
   const executePersonTransfer = async () => {
     const amt = parseFloat(amount.replace(',', '.'));
-    const name = recipientName.trim();
-    const account = recipientAccount.trim().replace(/\s/g, '');
+    const account = normalizeCardNumber(recipientAccount);
 
     if (!Number.isFinite(amt) || amt <= 0) {
       Alert.alert(t('error'), t('enterValidAmount'));
@@ -107,12 +145,12 @@ export function TransferScreen({ navigation, route }: Props) {
       Alert.alert(t('error'), t('selectCard'));
       return;
     }
-    if (!name) {
-      Alert.alert(t('error'), t('recipientNameRequired'));
-      return;
-    }
     if (account.length < 4) {
       Alert.alert(t('error'), t('recipientAccountRequired'));
+      return;
+    }
+    if (!recipientLookup?.found) {
+      Alert.alert(t('error'), t('recipientCardNotFound'));
       return;
     }
     if (fromCard.balance < amt) {
@@ -122,20 +160,30 @@ export function TransferScreen({ navigation, route }: Props) {
 
     setLoading(true);
     try {
-      await MonefyCore.addExpenseJson(
-        JSON.stringify({
-          amount: -Math.abs(amt),
-          description: `${name} · ${account}`,
-          paymentCard: fromCard.number,
-          category: TRANSFER_CATEGORY.id,
-          iconName: TRANSFER_CATEGORY.iconName,
-          iconColor: TRANSFER_CATEGORY.iconColor,
-          date: new Date().toISOString().split('T')[0],
-        }),
+      const recipientName = `${recipientLookup.firstName ?? ''} ${
+        recipientLookup.lastName ?? ''
+      }`.trim();
+      const transferDescription =
+        description.trim() ||
+        t('transferToPersonExpenseDesc', {
+          name: recipientName,
+          account: account.slice(-4),
+        });
+
+      await MonefyCore.transferToCard(
+        fromCard.number,
+        account,
+        amt,
+        transferDescription,
       );
-      Alert.alert(t('transferSuccess'), t('transferSuccessPerson', { name }), [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+      if (user?.id) {
+        await recordRecentPayment(user.id, 'transfer');
+      }
+      Alert.alert(
+        t('transferSuccess'),
+        t('transferSuccessPerson', { name: recipientName }),
+        [{ text: 'OK', onPress: () => navigation.goBack() }],
+      );
     } catch (e: unknown) {
       Alert.alert(t('error'), e instanceof Error ? e.message : String(e));
     } finally {
@@ -159,8 +207,9 @@ export function TransferScreen({ navigation, route }: Props) {
       ) : (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {cards.map(card => (
-            <Pressable
+            <AnimatedPressable
               key={card.number}
+              variant="tile"
               style={[
                 styles.cardChip,
                 {
@@ -182,7 +231,7 @@ export function TransferScreen({ navigation, route }: Props) {
               <Text style={[styles.cardChipBal, { color: colors.textMuted }]}>
                 {card.balance.toFixed(2)} ₽
               </Text>
-            </Pressable>
+            </AnimatedPressable>
           ))}
         </ScrollView>
       )}
@@ -198,7 +247,8 @@ export function TransferScreen({ navigation, route }: Props) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={{ paddingBottom: space.xxl }}>
         <View style={[styles.modeRow, { paddingHorizontal: space.lg, paddingTop: space.md }]}>
-          <Pressable
+          <AnimatedPressable
+            variant="soft"
             style={[
               styles.modeBtn,
               {
@@ -206,7 +256,10 @@ export function TransferScreen({ navigation, route }: Props) {
                 borderColor: mode === 'own' ? colors.brand : colors.border,
               },
             ]}
-            onPress={() => setMode('own')}>
+            onPress={() => {
+              animateNextLayout();
+              setMode('own');
+            }}>
             <Text
               style={[
                 styles.modeTxt,
@@ -214,8 +267,9 @@ export function TransferScreen({ navigation, route }: Props) {
               ]}>
               {t('transferOwnCards')}
             </Text>
-          </Pressable>
-          <Pressable
+          </AnimatedPressable>
+          <AnimatedPressable
+            variant="soft"
             style={[
               styles.modeBtn,
               {
@@ -223,7 +277,10 @@ export function TransferScreen({ navigation, route }: Props) {
                 borderColor: mode === 'person' ? colors.brand : colors.border,
               },
             ]}
-            onPress={() => setMode('person')}>
+            onPress={() => {
+              animateNextLayout();
+              setMode('person');
+            }}>
             <Text
               style={[
                 styles.modeTxt,
@@ -231,7 +288,7 @@ export function TransferScreen({ navigation, route }: Props) {
               ]}>
               {t('transferToPerson')}
             </Text>
-          </Pressable>
+          </AnimatedPressable>
         </View>
 
         {mode === 'own' && !canSubmitOwn ? (
@@ -259,8 +316,9 @@ export function TransferScreen({ navigation, route }: Props) {
                     {cards
                       .filter(c => c.number !== fromCard?.number)
                       .map(card => (
-                        <Pressable
+                        <AnimatedPressable
                           key={card.number}
+                          variant="tile"
                           style={[
                             styles.cardChip,
                             {
@@ -289,7 +347,7 @@ export function TransferScreen({ navigation, route }: Props) {
                           <Text style={[styles.cardChipBal, { color: colors.textMuted }]}>
                             {card.balance.toFixed(2)} ₽
                           </Text>
-                        </Pressable>
+                        </AnimatedPressable>
                       ))}
                   </ScrollView>
                 </View>
@@ -302,21 +360,6 @@ export function TransferScreen({ navigation, route }: Props) {
                 <TextInput
                   style={[
                     styles.input,
-                    styles.inputMargin,
-                    {
-                      backgroundColor: colors.card,
-                      borderColor: colors.border,
-                      color: colors.text,
-                    },
-                  ]}
-                  value={recipientName}
-                  onChangeText={setRecipientName}
-                  placeholder={t('recipientName')}
-                  placeholderTextColor={colors.textMuted}
-                />
-                <TextInput
-                  style={[
-                    styles.input,
                     {
                       backgroundColor: colors.card,
                       borderColor: colors.border,
@@ -324,15 +367,39 @@ export function TransferScreen({ navigation, route }: Props) {
                     },
                   ]}
                   value={recipientAccount}
-                  onChangeText={setRecipientAccount}
+                  onChangeText={value => setRecipientAccount(formatCardNumber(value))}
                   placeholder={t('recipientAccount')}
                   placeholderTextColor={colors.textMuted}
-                  keyboardType="default"
-                  autoCapitalize="characters"
+                  keyboardType="number-pad"
                 />
                 <Text style={[styles.hint, { color: colors.textMuted }]}>
                   {t('recipientAccountHint')}
                 </Text>
+                {lookupLoading ? (
+                  <Text style={[styles.lookupText, { color: colors.textMuted }]}>
+                    {t('checkingRecipient')}
+                  </Text>
+                ) : recipientLookup?.found ? (
+                  <View
+                    style={[
+                      styles.lookupCard,
+                      { backgroundColor: colors.brandSoft, borderColor: colors.brand },
+                    ]}>
+                    <Text style={[styles.lookupLabel, { color: colors.textMuted }]}>
+                      {t('recipientFound')}
+                    </Text>
+                    <Text style={[styles.lookupName, { color: colors.brand }]}>
+                      {recipientLookup.firstName} {recipientLookup.lastName}
+                    </Text>
+                    <Text style={[styles.lookupText, { color: colors.textSecondary }]}>
+                      {recipientLookup.maskedCardNumber}
+                    </Text>
+                  </View>
+                ) : recipientAccount.trim().length >= 4 ? (
+                  <Text style={[styles.lookupText, { color: colors.expense }]}>
+                    {t('recipientCardNotFound')}
+                  </Text>
+                ) : null}
               </View>
             )}
 
@@ -375,7 +442,8 @@ export function TransferScreen({ navigation, route }: Props) {
               />
             </View>
 
-            <Pressable
+            <AnimatedPressable
+              variant="primary"
               style={[
                 styles.submit,
                 { backgroundColor: loading ? colors.textMuted : colors.brand },
@@ -389,7 +457,7 @@ export function TransferScreen({ navigation, route }: Props) {
                     ? t('transferSubmit')
                     : t('transferSubmitPerson')}
               </Text>
-            </Pressable>
+            </AnimatedPressable>
           </>
         )}
       </ScrollView>
@@ -429,6 +497,15 @@ const styles = StyleSheet.create({
   },
   inputMargin: { marginBottom: space.sm },
   hint: { fontSize: 12, marginTop: space.sm, lineHeight: 18 },
+  lookupCard: {
+    borderWidth: 1,
+    borderRadius: radii.lg,
+    padding: space.md,
+    marginTop: space.md,
+  },
+  lookupLabel: { fontSize: 11, fontWeight: '700', marginBottom: 4 },
+  lookupName: { fontSize: 17, fontWeight: '800', marginBottom: 4 },
+  lookupText: { fontSize: 13, fontWeight: '600', marginTop: space.sm },
   submit: {
     margin: space.lg,
     borderRadius: radii.lg,

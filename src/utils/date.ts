@@ -26,7 +26,18 @@ export function formatDayForPreferences(
   mode: DateDisplayMode,
 ): string {
   const d = parseDayIso(iso);
-  const loc = locale === 'ru' ? 'ru-RU' : 'en-US';
+  const intlLocale: Record<AppLocale, string> = {
+    ru: 'ru-RU',
+    en: 'en-US',
+    uk: 'uk-UA',
+    kk: 'kk-KZ',
+    de: 'de-DE',
+    fr: 'fr-FR',
+    es: 'es-ES',
+    tr: 'tr-TR',
+    zh: 'zh-CN',
+  };
+  const loc = intlLocale[locale] ?? 'en-US';
   if (mode === 'iso') {
     return iso;
   }

@@ -2,13 +2,13 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useLayoutEffect, useState } from 'react';
 import {
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 
+import { AnimatedPressable } from '../components/AnimatedPressable';
 import { categoryGlyph } from '../constants/categoryGlyphs';
 import { useAppPreferences } from '../context/AppPreferencesContext';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -31,7 +31,8 @@ function CategoryListRow({
   onOpen: (id: string, title: string) => void;
 }) {
   return (
-    <Pressable
+    <AnimatedPressable
+      variant="soft"
       style={[
         styles.row,
         { backgroundColor: colors.card, borderColor: colors.border },
@@ -48,7 +49,7 @@ function CategoryListRow({
         ) : null}
       </View>
       <Text style={[styles.chev, { color: colors.textSecondary }]}>›</Text>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 

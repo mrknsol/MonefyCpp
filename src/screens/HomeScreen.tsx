@@ -3,15 +3,14 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AnimatedPressable, animateNextLayout } from '../components/AnimatedPressable';
 import { DecorBackdrop } from '../components/DecorBackdrop';
 import { categoryGlyph } from '../constants/categoryGlyphs';
 import { useAppPreferences } from '../context/AppPreferencesContext';
@@ -112,12 +111,13 @@ export function HomeScreen({ navigation }: Props) {
               {dateTitle}
             </Text>
           </View>
-          <Pressable
+          <AnimatedPressable
+            variant="icon"
             onPress={() => navigation.navigate('Settings')}
             style={[styles.iconPill, { backgroundColor: colors.card, borderColor: colors.border }]}
             hitSlop={12}>
             <Text style={styles.gear}>⚙︎</Text>
-          </Pressable>
+          </AnimatedPressable>
         </View>
 
         <View style={{ paddingHorizontal: space.lg }}>
@@ -127,7 +127,8 @@ export function HomeScreen({ navigation }: Props) {
               { backgroundColor: colors.card, borderColor: colors.border },
               cardShadow(false),
             ]}>
-            <Pressable
+            <AnimatedPressable
+              variant="icon"
               accessibilityRole="button"
               style={[styles.railBtn, { backgroundColor: colors.chip }]}
               onPress={() =>
@@ -138,19 +139,21 @@ export function HomeScreen({ navigation }: Props) {
                 })
               }>
               <Text style={[styles.railChev, { color: colors.text }]}>‹</Text>
-            </Pressable>
+            </AnimatedPressable>
             {!isToday ? (
-              <Pressable
+              <AnimatedPressable
+                variant="soft"
                 style={[styles.todayPill, { backgroundColor: colors.brandSoft }]}
                 onPress={() => setDay(new Date())}>
                 <Text style={[styles.todayPillTxt, { color: colors.brand }]}>
                   {t('today')}
                 </Text>
-              </Pressable>
+              </AnimatedPressable>
             ) : (
               <View style={styles.todaySpacer} />
             )}
-            <Pressable
+            <AnimatedPressable
+              variant="icon"
               accessibilityRole="button"
               style={[styles.railBtn, { backgroundColor: colors.chip }]}
               onPress={() =>
@@ -161,7 +164,7 @@ export function HomeScreen({ navigation }: Props) {
                 })
               }>
               <Text style={[styles.railChev, { color: colors.text }]}>›</Text>
-            </Pressable>
+            </AnimatedPressable>
           </View>
 
           <View
@@ -180,69 +183,71 @@ export function HomeScreen({ navigation }: Props) {
           </View>
 
           <View style={styles.ctaRow}>
-            <Pressable
+            <AnimatedPressable
+              variant="primary"
               disabled={!hasCards}
               onPress={() =>
                 navigation.navigate('Calculator', { date: dayIso, intent: 'expense' })
               }
-              style={({ pressed }) => [
+              style={[
                 styles.ctaPrimary,
                 {
                   backgroundColor: colors.brand,
-                  opacity: !hasCards ? 0.45 : pressed ? 0.92 : 1,
+                  opacity: !hasCards ? 0.45 : 1,
                 },
                 cardShadow(false),
               ]}>
               <Text style={[styles.ctaPrimaryTxt, { color: colors.inverseText }]}>
                 {t('newExpense')}
               </Text>
-            </Pressable>
-            <Pressable
+            </AnimatedPressable>
+            <AnimatedPressable
+              variant="primary"
               disabled={!hasCards}
               onPress={() =>
                 navigation.navigate('Calculator', { date: dayIso, intent: 'topup' })
               }
-              style={({ pressed }) => [
+              style={[
                 styles.ctaGhost,
                 {
                   borderColor: colors.topup,
                   backgroundColor: colors.card,
-                  opacity: !hasCards ? 0.45 : pressed ? 0.9 : 1,
+                  opacity: !hasCards ? 0.45 : 1,
                 },
               ]}>
               <Text style={[styles.ctaGhostTxt, { color: colors.topup }]}>
                 {t('topUpCard')}
               </Text>
-            </Pressable>
+            </AnimatedPressable>
           </View>
           {!hasCards ? (
             <Text style={[styles.hint, { color: colors.topup }]}>{t('addCardHint')}</Text>
           ) : null}
 
-          <Pressable
+          <AnimatedPressable
+            variant="tile"
             onPress={() => navigation.navigate('AllCategories')}
-            style={({ pressed }) => [
+            style={[
               styles.linkCard,
               {
                 backgroundColor: colors.cardElevated,
                 borderColor: colors.border,
-                opacity: pressed ? 0.92 : 1,
               },
             ]}>
             <Text style={[styles.linkCardTitle, { color: colors.text }]}>
               {t('browseCategories')}
             </Text>
             <Text style={[styles.linkCardChev, { color: colors.textMuted }]}>→</Text>
-          </Pressable>
+          </AnimatedPressable>
 
-          <Pressable
+          <AnimatedPressable
+            variant="tile"
             onPress={() => navigation.navigate('Cards')}
-            style={({ pressed }) => [
+            style={[
               styles.linkCard,
               {
                 backgroundColor: colors.cardElevated,
                 borderColor: colors.border,
-                opacity: pressed ? 0.92 : 1,
                 marginTop: space.sm,
               },
             ]}>
@@ -250,7 +255,7 @@ export function HomeScreen({ navigation }: Props) {
               {t('myCards')}
             </Text>
             <Text style={[styles.linkCardChev, { color: colors.textMuted }]}>→</Text>
-          </Pressable>
+          </AnimatedPressable>
         </View>
 
         <View style={[styles.sectionHead, { paddingHorizontal: space.lg }]}>
@@ -261,32 +266,40 @@ export function HomeScreen({ navigation }: Props) {
         
         <View style={{ paddingHorizontal: space.lg }}>
           <View style={[styles.tabContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <TouchableOpacity
+            <AnimatedPressable
+              variant="soft"
               style={[
                 styles.tab,
                 { backgroundColor: activeTab === 'categories' ? colors.chip : 'transparent' }
               ]}
-              onPress={() => setActiveTab('categories')}>
+              onPress={() => {
+                animateNextLayout();
+                setActiveTab('categories');
+              }}>
               <Text style={[
                 styles.tabText,
                 { color: activeTab === 'categories' ? colors.text : colors.textMuted }
               ]}>
                 {t('expensesByCategory')}
               </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
+            </AnimatedPressable>
+            <AnimatedPressable
+              variant="soft"
               style={[
                 styles.tab,
                 { backgroundColor: activeTab === 'operations' ? colors.chip : 'transparent' }
               ]}
-              onPress={() => setActiveTab('operations')}>
+              onPress={() => {
+                animateNextLayout();
+                setActiveTab('operations');
+              }}>
               <Text style={[
                 styles.tabText,
                 { color: activeTab === 'operations' ? colors.text : colors.textMuted }
               ]}>
                 {t('operationsDay')}
               </Text>
-            </TouchableOpacity>
+            </AnimatedPressable>
           </View>
 
           {activeTab === 'categories' ? (
@@ -355,16 +368,16 @@ export function HomeScreen({ navigation }: Props) {
                 const g = categoryGlyph(item.iconName || 'Custom');
                 const last = idx === transactions.length - 1;
                 return (
-                  <Pressable
+                  <AnimatedPressable
                     key={item.id}
+                    variant="soft"
                     onLongPress={() => deleteTx(item.id)}
-                    style={({ pressed }) => [
+                    style={[
                       styles.txCard,
                       {
                         backgroundColor: colors.card,
                         borderColor: colors.border,
                         marginBottom: last ? 0 : space.sm,
-                        opacity: pressed ? 0.96 : 1,
                       },
                       cardShadow(false),
                     ]}>
@@ -381,7 +394,7 @@ export function HomeScreen({ navigation }: Props) {
                     <Text style={[styles.txAmt, { color: colors.expense }]}>
                       −{item.amount.toFixed(2)}
                     </Text>
-                  </Pressable>
+                  </AnimatedPressable>
                 );
               })
             )

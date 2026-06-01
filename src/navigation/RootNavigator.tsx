@@ -11,6 +11,10 @@ import { CardsScreen } from '../screens/CardsScreen';
 import { CategoriesScreen } from '../screens/CategoriesScreen';
 import { CategoryDaysScreen } from '../screens/CategoryDaysScreen';
 import { EditCardScreen } from '../screens/EditCardScreen';
+import { FeedbackScreen } from '../screens/FeedbackScreen';
+import { LoanScreen } from '../screens/LoanScreen';
+import { MessageDetailScreen } from '../screens/MessageDetailScreen';
+import { MessagesScreen } from '../screens/MessagesScreen';
 import { MainTabNavigator } from './MainTabNavigator';
 import { PayScreen } from '../screens/PayScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
@@ -42,9 +46,13 @@ export type RootStackParamList = {
   AllCategories: undefined;
   CategoryDays: { categoryId: string; title?: string };
   AddCustomCategory: undefined;
-  AddOperation: { type: 'expense' | 'income' };
+  AddOperation: { type: 'expense' | 'income'; categoryId?: string; description?: string };
   Transfer: { fromCardNumber?: string };
   SetupPin: undefined;
+  Feedback: undefined;
+  Messages: undefined;
+  MessageDetail: { messageId: string };
+  Loan: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -56,6 +64,9 @@ export function RootNavigator() {
     <Stack.Navigator
       initialRouteName="Home"
       screenOptions={{
+        animation: 'fade_from_bottom',
+        animationDuration: 260,
+        gestureEnabled: true,
         headerShadowVisible: false,
         headerStyle: {
           backgroundColor: colors.cardElevated,
@@ -87,6 +98,10 @@ export function RootNavigator() {
       <Stack.Screen name="AddOperation" component={AddOperationScreen} />
       <Stack.Screen name="Transfer" component={TransferScreen} />
       <Stack.Screen name="SetupPin" component={SetupPinScreen} />
+      <Stack.Screen name="Feedback" component={FeedbackScreen} />
+      <Stack.Screen name="Messages" component={MessagesScreen} />
+      <Stack.Screen name="MessageDetail" component={MessageDetailScreen} />
+      <Stack.Screen name="Loan" component={LoanScreen} />
     </Stack.Navigator>
   );
 }

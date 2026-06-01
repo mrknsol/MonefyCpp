@@ -1,8 +1,9 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AnimatedPressable } from '../components/AnimatedPressable';
 import { PinPadModal } from '../components/PinPadModal';
 import { useAppPreferences } from '../context/AppPreferencesContext';
 import { useSecurity } from '../context/SecurityContext';
@@ -73,8 +74,9 @@ export function SetupPinScreen({ navigation }: Props) {
           <Text style={[styles.label, { color: colors.textSecondary }]}>{t('pinLength')}</Text>
           <View style={styles.row}>
             {([4, 6] as PinLength[]).map(n => (
-              <Pressable
+              <AnimatedPressable
                 key={n}
+                variant="soft"
                 style={[
                   styles.lenBtn,
                   {
@@ -90,17 +92,18 @@ export function SetupPinScreen({ navigation }: Props) {
                   ]}>
                   {n} {t('pinDigits')}
                 </Text>
-              </Pressable>
+              </AnimatedPressable>
             ))}
           </View>
 
-          <Pressable
+          <AnimatedPressable
+            variant="primary"
             style={[styles.primary, { backgroundColor: colors.brand }]}
             onPress={startSetup}>
             <Text style={[styles.primaryTxt, { color: colors.inverseText }]}>
               {hasPin ? t('changePin') : t('createPaymentPin')}
             </Text>
-          </Pressable>
+          </AnimatedPressable>
         </>
       )}
 

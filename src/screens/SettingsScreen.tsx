@@ -1,7 +1,9 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useLayoutEffect } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { AnimatedPressable } from '../components/AnimatedPressable';
+import { LanguagePicker } from '../components/LanguagePicker';
 import { useAppPreferences } from '../context/AppPreferencesContext';
 import type { ThemeColors } from '../theme/colors';
 import type { DateDisplayMode, ThemeMode } from '../i18n/translations';
@@ -24,7 +26,8 @@ function SettingSegment({
   colors: ThemeColors;
 }) {
   return (
-    <Pressable
+    <AnimatedPressable
+      variant="soft"
       onPress={onPress}
       style={[
         styles.seg,
@@ -42,7 +45,7 @@ function SettingSegment({
         ]}>
         {label}
       </Text>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
@@ -68,24 +71,15 @@ export function SettingsScreen({ navigation }: Props) {
       contentContainerStyle={[styles.wrap, { paddingBottom: space.xxl }]}>
       <View style={[styles.group, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Text style={[styles.groupTitle, { color: colors.textMuted }, typo.section]}>
-          {t('language').toUpperCase()}
+          {t('languageLabel').toUpperCase()}
         </Text>
-        <View style={styles.segRow}>
-          <SettingSegment
-            active={locale === 'ru'}
-            label={t('langRu')}
-            onPress={() => setLocale('ru')}
-            layout="inline"
-            colors={colors}
-          />
-          <SettingSegment
-            active={locale === 'en'}
-            label={t('langEn')}
-            onPress={() => setLocale('en')}
-            layout="inline"
-            colors={colors}
-          />
-        </View>
+        <LanguagePicker
+          colors={colors}
+          locale={locale}
+          onLocaleChange={setLocale}
+          label={t('languageLabel')}
+          selectTitle={t('selectLanguage')}
+        />
       </View>
 
       <View
@@ -144,19 +138,19 @@ export function SettingsScreen({ navigation }: Props) {
         </View>
       </View>
 
-      <Pressable
+      <AnimatedPressable
+        variant="primary"
         onPress={() => navigation.navigate('AddCustomCategory')}
-        style={({ pressed }) => [
+        style={[
           styles.cta,
           {
             backgroundColor: colors.brand,
-            opacity: pressed ? 0.9 : 1,
             marginTop: space.xl,
           },
           cardShadow(true),
         ]}>
         <Text style={[styles.ctaTxt, { color: colors.inverseText }]}>{t('addCategoryBtn')}</Text>
-      </Pressable>
+      </AnimatedPressable>
     </ScrollView>
   );
 }
