@@ -1,7 +1,9 @@
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  Animated,
+  Easing,
   ScrollView,
   StyleSheet,
   Switch,
@@ -41,6 +43,66 @@ export function ProfileScreen() {
   const [phoneLocal, setPhoneLocal] = useState('');
   const [isSavingPhone, setIsSavingPhone] = useState(false);
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const glowA = useRef(new Animated.Value(0)).current;
+  const glowB = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const glowALoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowA, {
+          toValue: 1,
+          duration: 2600,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(glowA, {
+          toValue: 0,
+          duration: 2600,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    const glowBLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowB, {
+          toValue: 1,
+          duration: 3400,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(glowB, {
+          toValue: 0,
+          duration: 3400,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    glowALoop.start();
+    glowBLoop.start();
+    return () => {
+      glowALoop.stop();
+      glowBLoop.stop();
+    };
+  }, [glowA, glowB]);
+
+  const glowAScale = glowA.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.9, 1.08],
+  });
+  const glowAOpacity = glowA.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.18, 0.34],
+  });
+  const glowBScale = glowB.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1.08, 0.92],
+  });
+  const glowBOpacity = glowB.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.12, 0.28],
+  });
 
   React.useEffect(() => {
     if (!user?.phone) {
@@ -128,23 +190,72 @@ export function ProfileScreen() {
           { backgroundColor: colors.bankCardStart },
           cardShadow(true),
         ]}>
-        <View style={[styles.profileGlow, { backgroundColor: colors.bankCardEnd }]} />
-        <View style={[styles.avatar, { backgroundColor: colors.gold }]}>
-          <Text style={[styles.avatarText, { color: colors.bankCardStart }]}>
-            {user?.name.charAt(0).toUpperCase() || 'U'}
-          </Text>
+        <Animated.View
+          style={[
+            styles.profileBlobLarge,
+            {
+              backgroundColor: colors.bankCardEnd,
+              opacity: glowAOpacity,
+              transform: [{ scale: glowAScale }],
+            },
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.profileBlobSmall,
+            {
+              backgroundColor: colors.gold,
+              opacity: glowBOpacity,
+              transform: [{ scale: glowBScale }],
+            },
+          ]}
+        />
+        <View style={styles.profileTopRow}>
+          <View style={[styles.avatar, { backgroundColor: colors.gold }]}>
+            <Text style={[styles.avatarText, { color: colors.bankCardStart }]}>
+              {user?.name.charAt(0).toUpperCase() || 'U'}
+            </Text>
+          </View>
+          <View style={styles.profileMainInfo}>
+            <Text style={[styles.profileName, { color: colors.onBankCard }]}>
+              {user?.name || t('user')}
+            </Text>
+            <Text style={[styles.profileEmail, { color: 'rgba(255,255,255,0.75)' }]}>
+              {user?.email}
+            </Text>
+            {user?.phone ? (
+              <Text style={[styles.profilePhone, { color: 'rgba(255,255,255,0.75)' }]}>
+                {user.phone}
+              </Text>
+            ) : null}
+          </View>
         </View>
-        <Text style={[styles.profileName, { color: colors.onBankCard }]}>
-          {user?.name || t('user')}
-        </Text>
-        <Text style={[styles.profileEmail, { color: 'rgba(255,255,255,0.75)' }]}>
-          {user?.email}
-        </Text>
-        {user?.phone ? (
-          <Text style={[styles.profilePhone, { color: 'rgba(255,255,255,0.75)' }]}>
-            {user.phone}
-          </Text>
-        ) : null}
+        <View style={styles.profileStatusRow}>
+          <View style={styles.profileStatusPill}>
+            <Text style={[styles.profileStatusValue, { color: colors.gold }]}>
+              {hasPin ? 'ON' : 'OFF'}
+            </Text>
+            <Text style={[styles.profileStatusLabel, { color: 'rgba(255,255,255,0.62)' }]}>
+              PIN
+            </Text>
+          </View>
+          <View style={styles.profileStatusPill}>
+            <Text style={[styles.profileStatusValue, { color: colors.gold }]}>
+              {faceIdEnabled ? 'ON' : 'OFF'}
+            </Text>
+            <Text style={[styles.profileStatusLabel, { color: 'rgba(255,255,255,0.62)' }]}>
+              Face ID
+            </Text>
+          </View>
+          <View style={styles.profileStatusPill}>
+            <Text style={[styles.profileStatusValue, { color: colors.gold }]}>
+              {unreadMessages}
+            </Text>
+            <Text style={[styles.profileStatusLabel, { color: 'rgba(255,255,255,0.62)' }]}>
+              {t('messagesTitle')}
+            </Text>
+          </View>
+        </View>
       </View>
 
       <ProfileAccountsSection />
@@ -329,32 +440,50 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   profileCard: {
     borderRadius: radii.xl,
-    padding: space.xl,
-    alignItems: 'center',
+    padding: space.lg,
     marginBottom: space.lg,
     overflow: 'hidden',
   },
-  profileGlow: {
+  profileBlobLarge: {
     position: 'absolute',
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    top: -50,
-    right: -30,
-    opacity: 0.4,
+    width: 170,
+    height: 170,
+    borderRadius: 85,
+    top: -54,
+    right: -42,
   },
+  profileBlobSmall: {
+    position: 'absolute',
+    width: 112,
+    height: 112,
+    borderRadius: 56,
+    left: -28,
+    bottom: -38,
+  },
+  profileTopRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   avatar: {
     width: 72,
     height: 72,
     borderRadius: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: space.md,
   },
   avatarText: { fontSize: 28, fontWeight: '900' },
+  profileMainInfo: { flex: 1, minWidth: 0 },
   profileName: { fontSize: 22, fontWeight: '800' },
   profileEmail: { fontSize: 14, marginTop: space.xs },
   profilePhone: { fontSize: 14, marginTop: 4, fontWeight: '600' },
+  profileStatusRow: { flexDirection: 'row', gap: space.sm, marginTop: space.lg },
+  profileStatusPill: {
+    flex: 1,
+    borderRadius: radii.lg,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    paddingVertical: space.sm,
+    paddingHorizontal: space.sm,
+    alignItems: 'center',
+  },
+  profileStatusValue: { fontSize: 15, fontWeight: '900' },
+  profileStatusLabel: { fontSize: 10, fontWeight: '800', marginTop: 2 },
   section: {
     borderRadius: radii.lg,
     borderWidth: 1,

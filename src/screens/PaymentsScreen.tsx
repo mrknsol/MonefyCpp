@@ -1,18 +1,20 @@
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnimatedPressable } from '../components/AnimatedPressable';
 import { AppIcon } from '../components/AppIcon';
+import { SpendingOrbitCard, type SpendingOrbitItem } from '../components/FinancialVisualCards';
 import { EXPENSE_CATEGORIES } from '../constants/categories';
 import { SERVICE_PAYMENTS, type ServicePayment } from '../constants/servicePayments';
 import { useAppPreferences } from '../context/AppPreferencesContext';
 import { useAuth } from '../context/AuthContext';
-import { MonefyCore } from '../native/monefyCore';
+import { resolveCategoryLabel } from '../i18n/translations';
+import { MonefyCore, parseJson } from '../native/monefyCore';
 import { recordRecentPayment } from '../services/recentPayments';
 import { cardShadow, radii, space } from '../theme/tokens';
-import type { CustomCategory } from '../types';
+import type { CustomCategory, Transaction } from '../types';
 import { loadCustomCategories, mergeUiCategories } from '../utils/categories';
 
 export function PaymentsScreen() {
@@ -22,11 +24,47 @@ export function PaymentsScreen() {
   const insets = useSafeAreaInsets();
   const [customCategoryName, setCustomCategoryName] = useState('');
   const [customCategories, setCustomCategories] = useState<CustomCategory[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isCreatingCustom, setIsCreatingCustom] = useState(false);
 
   const reloadCustomCategories = useCallback(async () => {
-    setCustomCategories(await loadCustomCategories());
+    const [categories, txJson] = await Promise.all([
+      loadCustomCategories(),
+      MonefyCore.getTransactionsJson(),
+    ]);
+    setCustomCategories(categories);
+    setTransactions(parseJson<Transaction[]>(txJson));
   }, []);
+
+  const spendingOrbit = useMemo<SpendingOrbitItem[]>(() => {
+    const now = new Date();
+    const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const grouped = new Map<
+      string,
+      { label: string; amount: number; color: string; iconName: string }
+    >();
+
+    transactions
+      .filter(tx => tx.date.startsWith(monthPrefix) && tx.amount < 0)
+      .forEach(tx => {
+        const current = grouped.get(tx.category);
+        if (current) {
+          current.amount += Math.abs(tx.amount);
+          return;
+        }
+        grouped.set(tx.category, {
+          label: resolveCategoryLabel(tx.category, locale, customCategories),
+          amount: Math.abs(tx.amount),
+          color: tx.iconColor,
+          iconName: tx.iconName || 'Custom',
+        });
+      });
+
+    return [...grouped.entries()]
+      .map(([key, value]) => ({ key, ...value }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 4);
+  }, [customCategories, locale, transactions]);
 
   useFocusEffect(
     useCallback(() => {
@@ -142,6 +180,8 @@ export function PaymentsScreen() {
       }}>
       <Text style={[styles.title, { color: colors.text }]}>{t('paymentsTitle')}</Text>
       <Text style={[styles.subtitle, { color: colors.textMuted }]}>{t('paymentsSubtitle')}</Text>
+
+      <SpendingOrbitCard items={spendingOrbit} colors={colors} t={t} padded={false} />
 
       <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
         {t('paymentsServicesSection').toUpperCase()}

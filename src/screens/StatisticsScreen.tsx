@@ -1,7 +1,10 @@
 import { useFocusEffect } from '@react-navigation/native';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
+  Easing,
   FlatList,
+  PanResponder,
   StyleSheet,
   Text,
   View,
@@ -10,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnimatedPressable, animateNextLayout } from '../components/AnimatedPressable';
 import { AppIcon } from '../components/AppIcon';
+import { CashflowWaveCard, type CashflowDay } from '../components/FinancialVisualCards';
 import { categoryIconName } from '../constants/categoryGlyphs';
 import { useAppPreferences } from '../context/AppPreferencesContext';
 import { resolveCategoryLabel } from '../i18n/translations';
@@ -17,7 +21,7 @@ import { MonefyCore, parseJson } from '../native/monefyCore';
 import type { CustomCategory, Transaction } from '../types';
 import { cardShadow, radii, space } from '../theme/tokens';
 import { loadCustomCategories } from '../utils/categories';
-import { formatDayForPreferences } from '../utils/date';
+import { formatDayForPreferences, formatDayIso } from '../utils/date';
 import {
   isDateInRange,
   statsPeriodRange,
@@ -27,6 +31,42 @@ import {
 type ActivityTab = 'expense' | 'income';
 
 const PERIODS: StatsPeriod[] = ['week', 'month', 'quarter', 'year', 'all'];
+const CHART_SEGMENTS = 72;
+const CHART_SIZE = 206;
+const CHART_SEGMENT_COLORS = [
+  '#4F8CFF',
+  '#22C55E',
+  '#F59E0B',
+  '#F43F5E',
+  '#A855F7',
+  '#06B6D4',
+  '#EC4899',
+  '#84CC16',
+  '#F97316',
+  '#14B8A6',
+];
+const WAVE_STEPS = 36;
+const WAVE_INPUT_RANGE = Array.from({ length: WAVE_STEPS + 1 }, (_, index) => index / WAVE_STEPS);
+const WAVE_WIDTH = 0.06;
+
+function waveOutputRange(segmentIndex: number) {
+  const segmentPosition = segmentIndex / CHART_SEGMENTS;
+  return WAVE_INPUT_RANGE.map(position => {
+    const directDistance = Math.abs(position - segmentPosition);
+    const circularDistance = Math.min(directDistance, 1 - directDistance);
+    if (circularDistance > WAVE_WIDTH) {
+      return 0.94;
+    }
+    return 0.94 + (1 - circularDistance / WAVE_WIDTH) * 0.32;
+  });
+}
+
+type ChartSlice = {
+  key: string;
+  label: string;
+  amount: number;
+  color: string;
+};
 
 export function StatisticsScreen() {
   const { colors, t, locale, dateDisplayMode } = useAppPreferences();
@@ -36,6 +76,7 @@ export function StatisticsScreen() {
   const [customCats, setCustomCats] = useState<CustomCategory[]>([]);
   const [period, setPeriod] = useState<StatsPeriod>('month');
   const [activeTab, setActiveTab] = useState<ActivityTab>('expense');
+  const [chartTab, setChartTab] = useState<ActivityTab>('expense');
 
   const reload = useCallback(async () => {
     try {
@@ -79,6 +120,58 @@ export function StatisticsScreen() {
   const visible = activeTab === 'expense' ? expenses : topUps;
   const expenseTotal = expenses.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
   const topUpTotal = topUps.reduce((sum, tx) => sum + tx.amount, 0);
+  const chartVisible = chartTab === 'expense' ? expenses : topUps;
+  const chartTotal = chartTab === 'expense' ? expenseTotal : topUpTotal;
+
+  const cashflowWave = useMemo<CashflowDay[]>(() => {
+    const today = new Date();
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(today);
+      date.setDate(today.getDate() - (6 - index));
+      const iso = formatDayIso(date);
+      const net = transactions
+        .filter(tx => tx.date === iso)
+        .reduce((sum, tx) => sum + tx.amount, 0);
+      return {
+        iso,
+        label: date.toLocaleDateString(undefined, { weekday: 'short' }).slice(0, 2),
+        net,
+      };
+    });
+  }, [transactions]);
+
+  const chartSlices = useMemo<ChartSlice[]>(() => {
+    const grouped = new Map<
+      string,
+      { label: string; iconColor: string; amount: number }
+    >();
+
+    chartVisible.forEach(tx => {
+      const amount = Math.abs(tx.amount);
+      if (amount <= 0) {
+        return;
+      }
+      const current = grouped.get(tx.category);
+      if (current) {
+        current.amount += amount;
+        return;
+      }
+      grouped.set(tx.category, {
+        label: resolveCategoryLabel(tx.category, locale, customCats),
+        iconColor: tx.iconColor,
+        amount,
+      });
+    });
+
+    return [...grouped.entries()]
+      .map(([key, value], index) => ({
+        key,
+        label: value.label,
+        amount: value.amount,
+        color: CHART_SEGMENT_COLORS[index % CHART_SEGMENT_COLORS.length] || value.iconColor,
+      }))
+      .sort((a, b) => b.amount - a.amount);
+  }, [chartVisible, locale, customCats]);
 
   const periodLabel = (p: StatsPeriod) => t(`statsPeriod_${p}`);
 
@@ -209,6 +302,25 @@ export function StatisticsScreen() {
               </View>
             </View>
 
+            <StatsPieChart
+              slices={chartSlices}
+              total={chartTotal}
+              title={t('statsChartTitle')}
+              emptyText={chartTab === 'expense' ? t('noExpensesPeriod') : t('noIncomePeriod')}
+              totalLabel={chartTab === 'expense' ? t('expenseTab') : t('incomeTab')}
+              onModeChange={setChartTab}
+              colors={{
+                card: colors.card,
+                border: colors.border,
+                chip: colors.chip,
+                text: colors.text,
+                textMuted: colors.textMuted,
+                brand: colors.brand,
+              }}
+            />
+
+            <CashflowWaveCard days={cashflowWave} colors={colors} t={t} padded={false} />
+
             <View
               style={[
                 styles.tabContainer,
@@ -266,6 +378,305 @@ export function StatisticsScreen() {
         }
         ItemSeparatorComponent={() => <View style={{ height: space.sm }} />}
       />
+    </View>
+  );
+}
+
+function StatsPieChart({
+  slices,
+  total,
+  title,
+  emptyText,
+  totalLabel,
+  onModeChange,
+  colors,
+}: {
+  slices: ChartSlice[];
+  total: number;
+  title: string;
+  emptyText: string;
+  totalLabel: string;
+  onModeChange: (mode: ActivityTab) => void;
+  colors: {
+    card: string;
+    border: string;
+    chip: string;
+    text: string;
+    textMuted: string;
+    brand: string;
+  };
+}) {
+  const progress = useRef(new Animated.Value(0)).current;
+  const breathe = useRef(new Animated.Value(0)).current;
+  const waveClock = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    progress.setValue(0);
+    Animated.spring(progress, {
+      toValue: 1,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 60,
+    }).start();
+  }, [progress, slices, total]);
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(breathe, {
+          toValue: 1,
+          duration: 1900,
+          useNativeDriver: true,
+        }),
+        Animated.timing(breathe, {
+          toValue: 0,
+          duration: 1900,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [breathe]);
+
+  useEffect(() => {
+    waveClock.setValue(0);
+    const loop = Animated.loop(
+      Animated.timing(waveClock, {
+        toValue: 1,
+        duration: 4800,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [waveClock]);
+
+  const chartSegments = useMemo(() => {
+    if (total <= 0 || slices.length === 0) {
+      return [];
+    }
+
+    const ranges: Array<{ until: number; color: string }> = [];
+    let cursor = 0;
+    slices.forEach(slice => {
+      cursor += slice.amount / total;
+      ranges.push({ until: cursor, color: slice.color });
+    });
+
+    return Array.from({ length: CHART_SEGMENTS }, (_, index) => {
+      const ratio = (index + 0.5) / CHART_SEGMENTS;
+      const range = ranges.find(item => ratio <= item.until);
+      return range?.color ?? colors.brand;
+    });
+  }, [colors.brand, slices, total]);
+
+  const topLegend = slices.slice(0, 4);
+  const radius = CHART_SIZE / 2 - 18;
+  const segmentHeight = 42;
+  const segmentWidth = 8;
+  const chartRotate = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['-24deg', '0deg'],
+  });
+  const chartScale = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.94, 1],
+  });
+  const glowScale = breathe.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.94, 1.08],
+  });
+  const glowOpacity = breathe.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.12, 0.32],
+  });
+  const haloScale = breathe.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.98, 1.04],
+  });
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          Math.abs(gesture.dx) > 18 && Math.abs(gesture.dx) > Math.abs(gesture.dy),
+        onPanResponderRelease: (_, gesture) => {
+          if (gesture.dx < -36) {
+            onModeChange('income');
+          }
+          if (gesture.dx > 36) {
+            onModeChange('expense');
+          }
+        },
+      }),
+    [onModeChange],
+  );
+
+  return (
+    <View
+      style={[
+        styles.chartCard,
+        { backgroundColor: colors.card, borderColor: colors.border },
+        cardShadow(false),
+      ]}
+      {...panResponder.panHandlers}>
+      <View style={styles.chartHeader}>
+        <Text style={[styles.chartTitle, { color: colors.text }]}>{title}</Text>
+        <View style={styles.chartHeaderRight}>
+          <Text style={[styles.chartSubtitle, { color: colors.textMuted }]}>{totalLabel}</Text>
+          <Text style={[styles.chartSwipeHint, { color: colors.textMuted }]}>‹ swipe ›</Text>
+        </View>
+      </View>
+
+      <View style={styles.chartBody}>
+        <View
+          style={[
+            styles.chartWrap,
+            {
+              width: CHART_SIZE,
+              height: CHART_SIZE,
+            },
+          ]}>
+          <Animated.View
+            style={[
+              styles.chartRingLayer,
+              {
+                transform: [{ rotate: chartRotate }, { scale: chartScale }],
+              },
+            ]}>
+            <Animated.View
+              style={[
+                styles.chartGlow,
+                {
+                  backgroundColor: chartSegments[0] ?? colors.brand,
+                  opacity: chartSegments.length ? glowOpacity : 0.05,
+                  transform: [{ scale: glowScale }],
+                },
+              ]}
+            />
+            <Animated.View
+              style={[
+                styles.chartOuterHalo,
+                {
+                  borderColor: chartSegments[0] ?? colors.border,
+                  transform: [{ scale: haloScale }],
+                },
+              ]}
+            />
+            {Array.from({ length: CHART_SEGMENTS }, (_, index) => {
+              const rotate = `${(360 / CHART_SEGMENTS) * index}deg`;
+              return (
+                <View
+                  key={`track-${index}`}
+                  style={[
+                    styles.chartSegment,
+                    {
+                      left: CHART_SIZE / 2 - segmentWidth / 2,
+                      top: CHART_SIZE / 2 - segmentHeight / 2,
+                      width: segmentWidth,
+                      height: segmentHeight,
+                      borderRadius: segmentWidth,
+                      backgroundColor: colors.chip,
+                      transform: [{ rotate }, { translateY: -radius }],
+                    },
+                  ]}
+                />
+              );
+            })}
+
+            {chartSegments.map((color, index) => {
+              const rotate = `${(360 / CHART_SEGMENTS) * index}deg`;
+              const delay = index / CHART_SEGMENTS;
+              const waveScale = waveClock.interpolate({
+                inputRange: WAVE_INPUT_RANGE,
+                outputRange: waveOutputRange(index),
+              });
+              const opacity = progress.interpolate({
+                inputRange: [0, Math.min(1, delay + 0.12), 1],
+                outputRange: [0, 1, 1],
+              });
+              const scaleY = progress.interpolate({
+                inputRange: [0, Math.min(1, delay + 0.18), 1],
+                outputRange: [0.35, 1, 1],
+              });
+            const combinedScale = Animated.multiply(scaleY, waveScale);
+            const anchoredTranslateY = Animated.add(
+              new Animated.Value(-radius),
+              Animated.multiply(Animated.subtract(combinedScale, 1), -segmentHeight / 2),
+            );
+
+              return (
+                <Animated.View
+                  key={`slice-${index}`}
+                  style={[
+                    styles.chartSegment,
+                    {
+                      left: CHART_SIZE / 2 - segmentWidth / 2,
+                      top: CHART_SIZE / 2 - segmentHeight / 2,
+                      width: segmentWidth,
+                      height: segmentHeight,
+                      borderRadius: segmentWidth,
+                      backgroundColor: color,
+                      opacity,
+                      transform: [
+                        { rotate },
+                      { translateY: anchoredTranslateY },
+                      { scaleY: combinedScale },
+                      ],
+                    },
+                  ]}
+                />
+              );
+            })}
+          </Animated.View>
+
+          <View
+            style={[
+              styles.chartCenter,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+                shadowColor: chartSegments[0] ?? colors.brand,
+              },
+            ]}>
+            <Text style={[styles.chartCenterValue, { color: colors.text }]}>
+              {total.toFixed(0)} ₽
+            </Text>
+            <Text style={[styles.chartCenterLabel, { color: colors.textMuted }]}>
+              {totalLabel}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.chartLegend}>
+          {topLegend.length === 0 ? (
+            <Text style={[styles.chartEmpty, { color: colors.textMuted }]}>{emptyText}</Text>
+          ) : (
+            topLegend.map(slice => (
+              <View
+                key={slice.key}
+                style={[
+                  styles.legendRow,
+                  { backgroundColor: colors.chip, borderColor: colors.border },
+                ]}>
+                <View style={[styles.legendDot, { backgroundColor: slice.color }]} />
+                <View style={styles.legendTextWrap}>
+                  <Text style={[styles.legendLabel, { color: colors.text }]} numberOfLines={1}>
+                    {slice.label}
+                  </Text>
+                  <Text style={[styles.legendAmount, { color: colors.textMuted }]}>
+                    {slice.amount.toFixed(0)} ₽
+                  </Text>
+                </View>
+                <Text style={[styles.legendPercent, { color: slice.color }]}>
+                  {Math.round((slice.amount / total) * 100)}%
+                </Text>
+              </View>
+            ))
+          )}
+        </View>
+      </View>
     </View>
   );
 }
@@ -330,6 +741,96 @@ const styles = StyleSheet.create({
   },
   summaryLabel: { fontSize: 12, fontWeight: '600', marginBottom: 4 },
   summaryValue: { fontSize: 18, fontWeight: '800' },
+  chartCard: {
+    borderWidth: 1,
+    borderRadius: radii.xl,
+    padding: space.lg,
+    marginBottom: space.lg,
+  },
+  chartHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: space.md,
+  },
+  chartTitle: { fontSize: 17, fontWeight: '800' },
+  chartHeaderRight: { alignItems: 'flex-end' },
+  chartSubtitle: { fontSize: 12, fontWeight: '700' },
+  chartSwipeHint: { fontSize: 10, fontWeight: '800', marginTop: 2, opacity: 0.75 },
+  chartBody: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: space.md,
+  },
+  chartWrap: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chartRingLayer: {
+    position: 'absolute',
+    width: CHART_SIZE,
+    height: CHART_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chartGlow: {
+    position: 'absolute',
+    width: 178,
+    height: 178,
+    borderRadius: 89,
+  },
+  chartOuterHalo: {
+    position: 'absolute',
+    width: 196,
+    height: 196,
+    borderRadius: 98,
+    borderWidth: 1,
+    opacity: 0.22,
+  },
+  chartSegment: {
+    position: 'absolute',
+  },
+  chartCenter: {
+    width: 104,
+    height: 104,
+    borderRadius: 52,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: space.sm,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.14,
+    shadowRadius: 18,
+    elevation: 6,
+  },
+  chartCenterValue: { fontSize: 20, fontWeight: '900', letterSpacing: -0.5 },
+  chartCenterLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  chartLegend: { width: '100%', gap: space.sm },
+  legendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    borderWidth: 1,
+    borderRadius: radii.md,
+    paddingVertical: space.sm,
+    paddingHorizontal: space.md,
+  },
+  legendDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  legendTextWrap: { flex: 1, minWidth: 0 },
+  legendLabel: { fontSize: 13, fontWeight: '800' },
+  legendAmount: { fontSize: 11, fontWeight: '700', marginTop: 2 },
+  legendPercent: { fontSize: 13, fontWeight: '900' },
+  chartEmpty: { fontSize: 13, lineHeight: 18 },
   tabContainer: {
     flexDirection: 'row',
     borderRadius: radii.lg,

@@ -16,12 +16,14 @@ import { MonefyCore } from '../native/monefyCore';
 import type { ThemeColors } from '../theme/colors';
 import { formatCardNumber, normalizeCardNumber } from '../utils/cardNumber';
 
+
 type Props = NativeStackScreenProps<RootStackParamList, 'EditCard'>;
 
 export function EditCardScreen({ navigation, route }: Props) {
   const { card: initial } = route.params;
   const { colors, t } = useAppPreferences();
   const oldNumber = initial.number;
+  const [isSavingPhone, setIsSavingPhone] = useState(false);
 
   const [name, setName] = useState(initial.name);
   const [surname, setSurname] = useState(initial.surname);
