@@ -33,10 +33,10 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Monefy Bank использует Face ID для подтверждения платежей и переводов</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string></string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>
