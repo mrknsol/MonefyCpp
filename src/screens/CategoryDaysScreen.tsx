@@ -3,29 +3,44 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useLayoutEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { ScreenLoading } from '../components/ScreenLoading';
 import { useAppPreferences } from '../context/AppPreferencesContext';
+import { resolveCategoryLabel } from '../i18n/translations';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { MonefyCore, parseJson } from '../native/monefyCore';
-import type { CategoryDayActivity } from '../types';
+import type { CategoryDayActivity, CustomCategory } from '../types';
+import { loadCustomCategories } from '../utils/categories';
 import { formatDayForPreferences } from '../utils/date';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CategoryDays'>;
 
 export function CategoryDaysScreen({ navigation, route }: Props) {
-  const { categoryId, title } = route.params;
+  const { categoryId } = route.params;
   const { colors, t, locale, dateDisplayMode } = useAppPreferences();
   const [rows, setRows] = useState<CategoryDayActivity[]>([]);
+  const [customCats, setCustomCats] = useState<CustomCategory[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useLayoutEffect(() => {
-    navigation.setOptions({ title: title || t('categoryDaysTitle') });
-  }, [navigation, title, t]);
+    const resolved = resolveCategoryLabel(categoryId, locale, customCats);
+    navigation.setOptions({ title: resolved || t('categoryDaysTitle') });
+  }, [navigation, categoryId, locale, customCats, t]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadCustomCategories().then(setCustomCats).catch(() => setCustomCats([]));
+    }, []),
+  );
 
   const load = useCallback(async () => {
+    setIsLoading(true);
     try {
       const j = await MonefyCore.getCategoryDatesJson(categoryId);
       setRows(parseJson<CategoryDayActivity[]>(j));
     } catch {
       setRows([]);
+    } finally {
+      setIsLoading(false);
     }
   }, [categoryId]);
 
@@ -38,7 +53,9 @@ export function CategoryDaysScreen({ navigation, route }: Props) {
   return (
     <ScrollView
       contentContainerStyle={[styles.wrap, { backgroundColor: colors.background }]}>
-      {rows.length === 0 ? (
+      {isLoading ? (
+        <ScreenLoading minHeight={200} />
+      ) : rows.length === 0 ? (
         <Text style={[styles.empty, { color: colors.textSecondary }]}>
           {t('noActivity')}
         </Text>

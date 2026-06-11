@@ -1,12 +1,30 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
+import {
+  DEV_API_PORT,
+  DEV_IOS_TARGET,
+  DEV_MACHINE_HOST,
+} from '../config/devApiHost';
+
 const TOKEN_KEY = '@monefy/apiToken';
 
-export const API_BASE_URL =
-  Platform.OS === 'android'
-    ? 'http://172.20.10.2:8080'
-    : 'http://172.20.10.2:8080';
+function resolveApiBaseUrl(): string {
+  const port = DEV_API_PORT;
+
+  if (Platform.OS === 'android') {
+    return `http://10.0.2.2:${port}`;
+  }
+
+  if (Platform.OS === 'ios') {
+    const host = DEV_IOS_TARGET === 'simulator' ? '127.0.0.1' : DEV_MACHINE_HOST;
+    return `http://${host}:${port}`;
+  }
+
+  return `http://${DEV_MACHINE_HOST}:${port}`;
+}
+
+export const API_BASE_URL = resolveApiBaseUrl();
 
 export async function setApiToken(token: string | null): Promise<void> {
   if (token) {

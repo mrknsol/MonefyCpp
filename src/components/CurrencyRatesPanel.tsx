@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+
+import { LoadingSpinner } from './LoadingSpinner';
 
 import { useAppPreferences } from '../context/AppPreferencesContext';
 import { fetchCurrencyRates, type CurrencyRate } from '../services/currencyRates';
@@ -49,7 +51,9 @@ export function CurrencyRatesPanel() {
         {t('currencyRatesTitle').toUpperCase()}
       </Text>
       {loading ? (
-        <ActivityIndicator color={colors.brand} style={styles.loader} />
+        <View style={styles.loader}>
+          <LoadingSpinner color={colors.brand} />
+        </View>
       ) : (
         rates.map(rate => (
           <View key={rate.code} style={styles.row}>

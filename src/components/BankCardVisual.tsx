@@ -37,7 +37,7 @@ export function BankCardVisual({
   showCvvLabel = 'Show CVV',
   hideCvvLabel = 'Hide CVV',
 }: Props) {
-  const displayName = card?.name || label || 'Monefy Bank';
+  const displayName = card?.name || label || 'Monefy';
   const last4 = card?.number?.slice(-4) ?? '••••';
   const cardNumber = card?.number ? formatCardNumber(card.number) : '•••• •••• •••• ••••';
   const expiry = card ? `${card.monthOfExpiry}/${card.yearOfExpiry}` : '••/••';
@@ -76,7 +76,7 @@ export function BankCardVisual({
         ]}>
         <View style={[styles.glow, { backgroundColor: glow }]} />
         <View style={styles.topRow}>
-          <Text style={[styles.bankName, { color: text }]}>MONEFY BANK</Text>
+          <Text style={[styles.bankName, { color: text }]}>MONEFY</Text>
           <View style={[styles.chip, { backgroundColor: accent }]} />
         </View>
         <Text style={[styles.balance, { color: text }]}>{balance.toFixed(2)} ₽</Text>

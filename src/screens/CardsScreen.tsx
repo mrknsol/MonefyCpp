@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnimatedPressable } from '../components/AnimatedPressable';
+import { ScreenLoading } from '../components/ScreenLoading';
 import { AppIcon } from '../components/AppIcon';
 import { BankCardVisual } from '../components/BankCardVisual';
 import { useAppPreferences } from '../context/AppPreferencesContext';
@@ -25,20 +26,26 @@ import { cardThemeForIndex } from '../utils/cardThemes';
 type Props = NativeStackScreenProps<RootStackParamList, 'Cards'>;
 
 export function CardsScreen({ navigation }: Props) {
-  const { colors, t } = useAppPreferences();
+  const { colors, t, locale } = useAppPreferences();
   const { requirePaymentAuth } = useSecurity();
   const insets = useSafeAreaInsets();
   const [cards, setCards] = useState<Card[]>([]);
   const [flippedCardNumber, setFlippedCardNumber] = useState<string | null>(null);
   const [cvvVisibleCardNumber, setCvvVisibleCardNumber] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useLayoutEffect(() => {
     navigation.setOptions({ title: t('navCards'), headerShown: false });
-  }, [navigation, t]);
+  }, [navigation, t, locale]);
 
   const reload = useCallback(async () => {
-    const j = await MonefyCore.getCardsJson();
-    setCards(parseJson<Card[]>(j));
+    setIsLoading(true);
+    try {
+      const j = await MonefyCore.getCardsJson();
+      setCards(parseJson<Card[]>(j));
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
   useFocusEffect(
@@ -108,7 +115,9 @@ export function CardsScreen({ navigation }: Props) {
           </View>
         </View>
 
-        {cards.length === 0 ? (
+        {isLoading && cards.length === 0 ? (
+          <ScreenLoading minHeight={200} />
+        ) : cards.length === 0 ? (
           <View
             style={[
               styles.emptyBox,

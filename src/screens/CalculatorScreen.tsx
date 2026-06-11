@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useLayoutEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Alert,
   StyleSheet,
@@ -10,6 +10,7 @@ import {
 
 import { AnimatedPressable } from '../components/AnimatedPressable';
 import { useAppPreferences } from '../context/AppPreferencesContext';
+import { useScreenTitle } from '../hooks/useScreenTitle';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { cardShadow, radii, space } from '../theme/tokens';
 
@@ -28,9 +29,7 @@ export function CalculatorScreen({ navigation, route }: Props) {
   const [display, setDisplay] = useState('0');
   const [description, setDescription] = useState('');
 
-  useLayoutEffect(() => {
-    navigation.setOptions({ title: t('navCalculator') });
-  }, [navigation, t]);
+  useScreenTitle('navCalculator');
 
   const append = (ch: string) => {
     setDisplay(prev => {

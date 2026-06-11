@@ -1,11 +1,13 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useCallback, useLayoutEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
 import { AnimatedPressable } from '../components/AnimatedPressable';
+import { ScreenLoading } from '../components/ScreenLoading';
 import { AppIcon, type AppIconName } from '../components/AppIcon';
 import { useAppPreferences } from '../context/AppPreferencesContext';
+import { useScreenTitle } from '../hooks/useScreenTitle';
 import { useAuth } from '../context/AuthContext';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { loadMessages, markMessageRead, type AppMessage } from '../services/messages';
@@ -24,16 +26,21 @@ export function MessagesScreen({ navigation }: Props) {
   const { colors, t, locale, dateDisplayMode } = useAppPreferences();
   const { user } = useAuth();
   const [messages, setMessages] = useState<AppMessage[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  useLayoutEffect(() => {
-    navigation.setOptions({ title: t('messagesTitle') });
-  }, [navigation, t]);
+  useScreenTitle('messagesTitle');
 
   const reload = useCallback(async () => {
     if (!user?.id) {
+      setIsLoading(false);
       return;
     }
-    setMessages(await loadMessages(user.id));
+    setIsLoading(true);
+    try {
+      setMessages(await loadMessages(user.id));
+    } finally {
+      setIsLoading(false);
+    }
   }, [user?.id]);
 
   useFocusEffect(
@@ -58,7 +65,11 @@ export function MessagesScreen({ navigation }: Props) {
       style={{ backgroundColor: colors.background }}
       contentContainerStyle={styles.list}
       ListEmptyComponent={
-        <Text style={[styles.empty, { color: colors.textMuted }]}>{t('messagesEmpty')}</Text>
+        isLoading ? (
+          <ScreenLoading minHeight={200} />
+        ) : (
+          <Text style={[styles.empty, { color: colors.textMuted }]}>{t('messagesEmpty')}</Text>
+        )
       }
       renderItem={({ item }) => (
         <AnimatedPressable

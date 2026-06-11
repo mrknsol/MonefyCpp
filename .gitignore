@@ -1,3 +1,7 @@
+# Secrets
+.env
+backend/monefy-bank-api/.env
+
 # OSX
 #
 .DS_Store

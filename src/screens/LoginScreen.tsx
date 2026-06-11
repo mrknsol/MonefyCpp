@@ -1,3 +1,4 @@
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
 import {
   Alert,
@@ -9,11 +10,15 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnimatedPressable } from '../components/AnimatedPressable';
+import { LoadingButtonContent } from '../components/LoadingButtonContent';
 import { useAppPreferences } from '../context/AppPreferencesContext';
 import { useAuth } from '../context/AuthContext';
+import type { AuthStackParamList } from '../navigation/AuthNavigator';
 import { cardShadow, radii, space } from '../theme/tokens';
 
-export function LoginScreen({ onRegister }: { onRegister: () => void }) {
+type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
+
+export function LoginScreen({ navigation }: Props) {
   const { colors, t } = useAppPreferences();
   const { login } = useAuth();
   const insets = useSafeAreaInsets();
@@ -45,7 +50,7 @@ export function LoginScreen({ onRegister }: { onRegister: () => void }) {
       ]}>
       <View style={[styles.heroBand, { backgroundColor: colors.bankCardStart }]}>
         <View style={[styles.heroGlow, { backgroundColor: colors.bankCardEnd }]} />
-        <Text style={[styles.bankLogo, { color: colors.onBankCard }]}>MONEFY BANK</Text>
+        <Text style={[styles.bankLogo, { color: colors.onBankCard }]}>MONEFY</Text>
         <Text style={[styles.bankSub, { color: 'rgba(255,255,255,0.7)' }]}>
           {t('bankTagline')}
         </Text>
@@ -63,7 +68,7 @@ export function LoginScreen({ onRegister }: { onRegister: () => void }) {
             styles.input,
             { backgroundColor: colors.chip, color: colors.text, borderColor: colors.border },
           ]}
-          placeholder="Email"
+          placeholder={t('emailPlaceholder')}
           placeholderTextColor={colors.textMuted}
           value={email}
           onChangeText={setEmail}
@@ -90,18 +95,33 @@ export function LoginScreen({ onRegister }: { onRegister: () => void }) {
           style={[styles.button, { backgroundColor: colors.brand }]}
           onPress={handleLogin}
           disabled={isLoading}>
-          <Text style={[styles.buttonText, { color: colors.inverseText }]}>
-            {isLoading ? '...' : t('signIn')}
-          </Text>
+          {isLoading ? (
+            <LoadingButtonContent
+              label={t('signIn')}
+              textColor={colors.inverseText}
+            />
+          ) : (
+            <Text style={[styles.buttonText, { color: colors.inverseText }]}>
+              {t('signIn')}
+            </Text>
+          )}
         </AnimatedPressable>
 
-        <AnimatedPressable variant="soft" style={styles.footer} onPress={onRegister}>
+        <AnimatedPressable
+          variant="soft"
+          style={styles.forgotWrap}
+          onPress={() => navigation.navigate('ForgotPassword')}>
+          <Text style={[styles.link, { color: colors.brand }]}>{t('forgotPasswordLink')}</Text>
+        </AnimatedPressable>
+
+        <AnimatedPressable
+          variant="soft"
+          style={styles.footer}
+          onPress={() => navigation.navigate('Register')}>
           <Text style={[styles.link, { color: colors.brand }]}>{t('signUpLink')}</Text>
         </AnimatedPressable>
 
-        <Text style={[styles.demo, { color: colors.textMuted }]}>
-          demo@monefy.com / demo123
-        </Text>
+        <Text style={[styles.demo, { color: colors.textMuted }]}>{t('loginDemoHint')}</Text>
       </View>
     </View>
   );
@@ -155,7 +175,8 @@ const styles = StyleSheet.create({
     marginTop: space.sm,
   },
   buttonText: { fontSize: 17, fontWeight: '800' },
-  footer: { marginTop: space.xl, alignItems: 'center' },
+  forgotWrap: { marginTop: space.md, alignItems: 'center' },
+  footer: { marginTop: space.lg, alignItems: 'center' },
   link: { fontSize: 15, fontWeight: '700' },
   demo: { marginTop: space.xl, textAlign: 'center', fontSize: 12 },
 });

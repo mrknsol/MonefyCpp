@@ -1,8 +1,9 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useLayoutEffect } from 'react';
+import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useAppPreferences } from '../context/AppPreferencesContext';
+import { useScreenTitle } from '../hooks/useScreenTitle';
 import { useAuth } from '../context/AuthContext';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { loadMessages } from '../services/messages';
@@ -18,9 +19,7 @@ export function MessageDetailScreen({ navigation, route }: Props) {
   const [title, setTitle] = React.useState('');
   const [date, setDate] = React.useState('');
 
-  useLayoutEffect(() => {
-    navigation.setOptions({ title: t('messageDetailTitle') });
-  }, [navigation, t]);
+  useScreenTitle('messageDetailTitle');
 
   React.useEffect(() => {
     if (!user?.id) {

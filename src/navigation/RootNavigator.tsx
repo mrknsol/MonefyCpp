@@ -18,7 +18,11 @@ import { MessagesScreen } from '../screens/MessagesScreen';
 import { MainTabNavigator } from './MainTabNavigator';
 import { PayScreen } from '../screens/PayScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
+import { ChangeEmailScreen } from '../screens/ChangeEmailScreen';
+import { ChangePasswordScreen } from '../screens/ChangePasswordScreen';
+import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
 import { SetupPinScreen } from '../screens/SetupPinScreen';
+import type { ForgotPasswordParams } from './forgotPasswordParams';
 import { TransferScreen } from '../screens/TransferScreen';
 import type { Card } from '../types';
 
@@ -49,6 +53,9 @@ export type RootStackParamList = {
   AddOperation: { type: 'expense' | 'income'; categoryId?: string; description?: string };
   Transfer: { fromCardNumber?: string };
   SetupPin: undefined;
+  ChangePassword: undefined;
+  ChangeEmail: undefined;
+  ForgotPassword: ForgotPasswordParams | undefined;
   Feedback: undefined;
   Messages: undefined;
   MessageDetail: { messageId: string };
@@ -98,6 +105,13 @@ export function RootNavigator() {
       <Stack.Screen name="AddOperation" component={AddOperationScreen} />
       <Stack.Screen name="Transfer" component={TransferScreen} />
       <Stack.Screen name="SetupPin" component={SetupPinScreen} />
+      <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+      <Stack.Screen name="ChangeEmail" component={ChangeEmailScreen} />
+      <Stack.Screen
+        name="ForgotPassword"
+        component={ForgotPasswordScreen}
+        options={{ headerShown: false }}
+      />
       <Stack.Screen name="Feedback" component={FeedbackScreen} />
       <Stack.Screen name="Messages" component={MessagesScreen} />
       <Stack.Screen name="MessageDetail" component={MessageDetailScreen} />

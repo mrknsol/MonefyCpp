@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useLayoutEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -10,7 +10,9 @@ import {
 } from 'react-native';
 
 import { AnimatedPressable } from '../components/AnimatedPressable';
+import { LoadingButtonContent } from '../components/LoadingButtonContent';
 import { useAppPreferences } from '../context/AppPreferencesContext';
+import { useScreenTitle } from '../hooks/useScreenTitle';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { MonefyCore } from '../native/monefyCore';
 import type { ThemeColors } from '../theme/colors';
@@ -27,10 +29,9 @@ export function AddCardScreen({ navigation }: Props) {
   const [year, setYear] = useState('');
   const [cvv, setCvv] = useState('');
   const [balance, setBalance] = useState('0');
+  const [isSaving, setIsSaving] = useState(false);
 
-  useLayoutEffect(() => {
-    navigation.setOptions({ title: t('navAddCard') });
-  }, [navigation, t]);
+  useScreenTitle('navAddCard');
 
   const save = async () => {
     const bal = parseFloat(balance.replace(',', '.'));
@@ -48,11 +49,14 @@ export function AddCardScreen({ navigation }: Props) {
       cvv: cvv.trim(),
       balance: Number.isFinite(bal) ? bal : 0,
     });
+    setIsSaving(true);
     try {
       await MonefyCore.addCardJson(payload);
       navigation.goBack();
     } catch (e: unknown) {
       Alert.alert(t('error'), String(e));
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -87,9 +91,17 @@ export function AddCardScreen({ navigation }: Props) {
       />
       <AnimatedPressable
         variant="primary"
-        style={[styles.save, { backgroundColor: colors.accentMuted }]}
+        disabled={isSaving}
+        style={[
+          styles.save,
+          { backgroundColor: colors.accentMuted, opacity: isSaving ? 0.7 : 1 },
+        ]}
         onPress={save}>
-        <Text style={styles.saveTxt}>{t('save')}</Text>
+        {isSaving ? (
+          <LoadingButtonContent label={t('saving')} textColor="#fff" />
+        ) : (
+          <Text style={styles.saveTxt}>{t('save')}</Text>
+        )}
       </AnimatedPressable>
     </ScrollView>
   );

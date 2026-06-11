@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useLayoutEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -10,7 +10,9 @@ import {
 } from 'react-native';
 
 import { AnimatedPressable } from '../components/AnimatedPressable';
+import { LoadingButtonContent } from '../components/LoadingButtonContent';
 import { useAppPreferences } from '../context/AppPreferencesContext';
+import { useScreenTitle } from '../hooks/useScreenTitle';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { MonefyCore } from '../native/monefyCore';
 import type { ThemeColors } from '../theme/colors';
@@ -23,7 +25,7 @@ export function EditCardScreen({ navigation, route }: Props) {
   const { card: initial } = route.params;
   const { colors, t } = useAppPreferences();
   const oldNumber = initial.number;
-  const [isSavingPhone, setIsSavingPhone] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [name, setName] = useState(initial.name);
   const [surname, setSurname] = useState(initial.surname);
@@ -33,9 +35,7 @@ export function EditCardScreen({ navigation, route }: Props) {
   const [cvv, setCvv] = useState(initial.cvv);
   const [balance, setBalance] = useState(String(initial.balance));
 
-  useLayoutEffect(() => {
-    navigation.setOptions({ title: t('navEditCard') });
-  }, [navigation, t]);
+  useScreenTitle('navEditCard');
 
   const save = async () => {
     const normalizedNumber = normalizeCardNumber(number);
@@ -53,11 +53,14 @@ export function EditCardScreen({ navigation, route }: Props) {
       cvv: cvv.trim(),
       balance: Number.isFinite(bal) ? bal : initial.balance,
     });
+    setIsSaving(true);
     try {
       await MonefyCore.updateCardJson(oldNumber, payload);
       navigation.goBack();
     } catch (e: unknown) {
       Alert.alert(t('error'), String(e));
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -117,9 +120,17 @@ export function EditCardScreen({ navigation, route }: Props) {
       />
       <AnimatedPressable
         variant="primary"
-        style={[styles.save, { backgroundColor: colors.accentMuted }]}
+        disabled={isSaving}
+        style={[
+          styles.save,
+          { backgroundColor: colors.accentMuted, opacity: isSaving ? 0.7 : 1 },
+        ]}
         onPress={save}>
-        <Text style={styles.saveTxt}>{t('save')}</Text>
+        {isSaving ? (
+          <LoadingButtonContent label={t('saving')} textColor="#fff" />
+        ) : (
+          <Text style={styles.saveTxt}>{t('save')}</Text>
+        )}
       </AnimatedPressable>
     </ScrollView>
   );

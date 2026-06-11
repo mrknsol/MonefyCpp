@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnimatedPressable } from '../components/AnimatedPressable';
+import { LoadingButtonContent } from '../components/LoadingButtonContent';
 import { LanguagePicker } from '../components/LanguagePicker';
 import { ProfileAccountsSection } from '../components/ProfileAccountsSection';
 import { PhoneCountryPicker } from '../components/PhoneCountryPicker';
@@ -233,18 +234,18 @@ export function ProfileScreen() {
         <View style={styles.profileStatusRow}>
           <View style={styles.profileStatusPill}>
             <Text style={[styles.profileStatusValue, { color: colors.gold }]}>
-              {hasPin ? 'ON' : 'OFF'}
+              {hasPin ? t('statusOn') : t('statusOff')}
             </Text>
             <Text style={[styles.profileStatusLabel, { color: 'rgba(255,255,255,0.62)' }]}>
-              PIN
+              {t('pinShort')}
             </Text>
           </View>
           <View style={styles.profileStatusPill}>
             <Text style={[styles.profileStatusValue, { color: colors.gold }]}>
-              {faceIdEnabled ? 'ON' : 'OFF'}
+              {faceIdEnabled ? t('statusOn') : t('statusOff')}
             </Text>
             <Text style={[styles.profileStatusLabel, { color: 'rgba(255,255,255,0.62)' }]}>
-              Face ID
+              {t('faceId')}
             </Text>
           </View>
           <View style={styles.profileStatusPill}>
@@ -266,6 +267,45 @@ export function ProfileScreen() {
           { backgroundColor: colors.card, borderColor: colors.border },
           cardShadow(false),
         ]}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('accountSecurity')}</Text>
+
+        <AnimatedPressable
+          variant="soft"
+          style={styles.settingItem}
+          onPress={() => navigation.navigate('ChangeEmail')}>
+          <View style={styles.settingLeft}>
+            <Text style={[styles.settingLabel, { color: colors.text }]}>
+              {t('changeEmailTitle')}
+            </Text>
+            <Text style={[styles.settingValue, { color: colors.textMuted }]}>
+              {user?.email}
+            </Text>
+          </View>
+          <Text style={[styles.chevron, { color: colors.brand }]}>›</Text>
+        </AnimatedPressable>
+
+        <AnimatedPressable
+          variant="soft"
+          style={styles.settingItem}
+          onPress={() => navigation.navigate('ChangePassword')}>
+          <View style={styles.settingLeft}>
+            <Text style={[styles.settingLabel, { color: colors.text }]}>
+              {t('changePasswordTitle')}
+            </Text>
+            <Text style={[styles.settingValue, { color: colors.textMuted }]}>
+              {t('changePasswordMenuHint')}
+            </Text>
+          </View>
+          <Text style={[styles.chevron, { color: colors.brand }]}>›</Text>
+        </AnimatedPressable>
+      </View>
+
+      <View
+        style={[
+          styles.section,
+          { backgroundColor: colors.card, borderColor: colors.border },
+          cardShadow(false),
+        ]}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('phoneBinding')}</Text>
         <Text style={[styles.sectionHint, { color: colors.textMuted }]}>{t('phoneBindingHint')}</Text>
         <PhoneCountryPicker
@@ -280,12 +320,19 @@ export function ProfileScreen() {
         />
         <AnimatedPressable
           variant="primary"
-          style={[styles.savePhoneBtn, { backgroundColor: colors.brand }]}
+          style={[
+            styles.savePhoneBtn,
+            { backgroundColor: colors.brand, opacity: isSavingPhone ? 0.7 : 1 },
+          ]}
           onPress={savePhone}
           disabled={isSavingPhone}>
-          <Text style={[styles.savePhoneText, { color: colors.inverseText }]}>
-            {isSavingPhone ? t('saving') : t('bindPhone')}
-          </Text>
+          {isSavingPhone ? (
+            <LoadingButtonContent label={t('saving')} textColor={colors.inverseText} />
+          ) : (
+            <Text style={[styles.savePhoneText, { color: colors.inverseText }]}>
+              {t('bindPhone')}
+            </Text>
+          )}
         </AnimatedPressable>
       </View>
 
@@ -356,7 +403,7 @@ export function ProfileScreen() {
               {hasPin ? t('changePin') : t('createPaymentPin')}
             </Text>
             <Text style={[styles.settingValue, { color: colors.textMuted }]}>
-              {hasPin ? '••••' : t('paymentSecurityHint')}
+              {hasPin ? t('pinMasked') : t('paymentSecurityHint')}
             </Text>
           </View>
           <Text style={[styles.chevron, { color: colors.brand }]}>›</Text>

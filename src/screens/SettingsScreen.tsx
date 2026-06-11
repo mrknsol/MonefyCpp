@@ -1,10 +1,11 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useLayoutEffect } from 'react';
+import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AnimatedPressable } from '../components/AnimatedPressable';
 import { LanguagePicker } from '../components/LanguagePicker';
 import { useAppPreferences } from '../context/AppPreferencesContext';
+import { useScreenTitle } from '../hooks/useScreenTitle';
 import type { ThemeColors } from '../theme/colors';
 import type { DateDisplayMode, ThemeMode } from '../i18n/translations';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -61,9 +62,7 @@ export function SettingsScreen({ navigation }: Props) {
     setDateDisplayMode,
   } = useAppPreferences();
 
-  useLayoutEffect(() => {
-    navigation.setOptions({ title: t('settingsTitle') });
-  }, [navigation, t]);
+  useScreenTitle('settingsTitle');
 
   return (
     <ScrollView

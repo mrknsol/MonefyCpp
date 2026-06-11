@@ -1,3 +1,6 @@
+#include "email_sender.hpp"
+
+#include <curl/curl.h>
 #include <drogon/drogon.h>
 #include <openssl/sha.h>
 #include <pqxx/pqxx>
@@ -830,10 +833,351 @@ void external_transfer(const drogon::HttpRequestPtr &req, Callback &&cb)
   }
 }
 
+bool expose_dev_codes()
+{
+  if (monefy::email::smtp_configured()) {
+    return env_or("MONEFY_EXPOSE_VERIFICATION_CODES", "0") == "1";
+  }
+  return env_or("MONEFY_EXPOSE_VERIFICATION_CODES", "1") == "1";
+}
+
+std::string verification_code()
+{
+  static std::random_device rd;
+  static std::mt19937 gen(rd());
+  std::uniform_int_distribution<int> dist(100000, 999999);
+  return std::to_string(dist(gen));
+}
+
+bool send_verification_email(const std::string &email,
+                             const std::string &purpose_ru,
+                             const std::string &code)
+{
+  return monefy::email::send_verification_code(email, purpose_ru, code);
+}
+
+bool should_expose_dev_code(const std::string &code, bool email_sent)
+{
+  if (code.empty()) {
+    return false;
+  }
+  if (expose_dev_codes()) {
+    return true;
+  }
+  return !email_sent;
+}
+
+void store_verification_code(pqxx::work &tx, const std::string &email,
+                             const std::string &purpose, const std::string &code,
+                             const std::string &user_id = "")
+{
+  tx.exec_params(
+      "delete from email_verification_codes where lower(email)=lower($1) and purpose=$2",
+      email, purpose);
+  if (user_id.empty()) {
+    tx.exec_params(
+        "insert into email_verification_codes(email,purpose,code,expires_at) "
+        "values(lower($1),$2,$3,now()+interval '15 minutes')",
+        email, purpose, code);
+  } else {
+    tx.exec_params(
+        "insert into email_verification_codes(email,purpose,code,user_id,expires_at) "
+        "values(lower($1),$2,$3,$4::uuid,now()+interval '15 minutes')",
+        email, purpose, code, user_id);
+  }
+}
+
+bool consume_verification_code(pqxx::work &tx, const std::string &email,
+                               const std::string &purpose,
+                               const std::string &code,
+                               const std::string &user_id = "")
+{
+  if (user_id.empty()) {
+    auto rows = tx.exec_params(
+        "delete from email_verification_codes "
+        "where lower(email)=lower($1) and purpose=$2 and code=$3 and expires_at > now() "
+        "returning id",
+        email, purpose, code);
+    return !rows.empty();
+  }
+  auto rows = tx.exec_params(
+      "delete from email_verification_codes "
+      "where lower(email)=lower($1) and purpose=$2 and code=$3 and user_id=$4::uuid "
+      "and expires_at > now() returning id",
+      email, purpose, code, user_id);
+  return !rows.empty();
+}
+
+void set_user_password(pqxx::work &tx, const std::string &user_id,
+                       const std::string &password)
+{
+  const auto salt = random_hex(16);
+  const auto hash = sha256(salt + password);
+  tx.exec_params("update users set password_hash=$1, password_salt=$2 where id=$3",
+                 hash, salt, user_id);
+}
+
+Json::Value ok_message(const std::string &message, const std::string &dev_code = "",
+                     bool email_sent = true)
+{
+  Json::Value out;
+  out["ok"] = true;
+  out["message"] = message;
+  if (should_expose_dev_code(dev_code, email_sent)) {
+    out["devCode"] = dev_code;
+  }
+  return out;
+}
+
+void auth_forgot_send_code(const drogon::HttpRequestPtr &req, Callback &&cb)
+{
+  const auto body = req->getJsonObject();
+  if (!body) {
+    cb(error_response("Invalid JSON", drogon::k400BadRequest));
+    return;
+  }
+  const auto email = body_string(*body, "email");
+  if (email.empty()) {
+    cb(error_response("Email required", drogon::k400BadRequest));
+    return;
+  }
+
+  try {
+    auto c = db.connect();
+    pqxx::work tx(c);
+    auto rows = tx.exec_params(
+        "select id from users where lower(email)=lower($1)", email);
+    std::string code;
+    bool email_sent = true;
+    if (!rows.empty()) {
+      code = verification_code();
+      store_verification_code(tx, email, "reset_password", code);
+      email_sent = send_verification_email(email, "Сброс пароля Monefy", code);
+    }
+    tx.commit();
+    cb(json_response(ok_message(
+        "If this email is registered, a verification code has been sent", code,
+        email_sent)));
+  } catch (const std::exception &e) {
+    cb(error_response(e.what(), drogon::k500InternalServerError));
+  }
+}
+
+void auth_forgot_reset(const drogon::HttpRequestPtr &req, Callback &&cb)
+{
+  const auto body = req->getJsonObject();
+  if (!body) {
+    cb(error_response("Invalid JSON", drogon::k400BadRequest));
+    return;
+  }
+  const auto email = body_string(*body, "email");
+  const auto code = body_string(*body, "code");
+  const auto new_password = body_string(*body, "newPassword");
+  if (email.empty() || code.empty() || new_password.size() < 6) {
+    cb(error_response("Invalid reset data", drogon::k400BadRequest));
+    return;
+  }
+
+  try {
+    auto c = db.connect();
+    pqxx::work tx(c);
+    if (!consume_verification_code(tx, email, "reset_password", code)) {
+      cb(error_response("Invalid or expired code", drogon::k400BadRequest));
+      return;
+    }
+    auto rows = tx.exec_params(
+        "select id from users where lower(email)=lower($1)", email);
+    if (rows.empty()) {
+      cb(error_response("User not found", drogon::k404NotFound));
+      return;
+    }
+    const auto user_id = rows[0]["id"].as<std::string>();
+    set_user_password(tx, user_id, new_password);
+    tx.exec_params("delete from sessions where user_id=$1", user_id);
+    tx.commit();
+    cb(json_response(ok_message("Password updated")));
+  } catch (const std::exception &e) {
+    cb(error_response(e.what(), drogon::k500InternalServerError));
+  }
+}
+
+void auth_change_password(const drogon::HttpRequestPtr &req, Callback &&cb)
+{
+  std::string user_id;
+  if (!require_auth(req, cb, user_id)) return;
+  const auto body = req->getJsonObject();
+  if (!body) {
+    cb(error_response("Invalid JSON", drogon::k400BadRequest));
+    return;
+  }
+  const auto old_password = body_string(*body, "oldPassword");
+  const auto new_password = body_string(*body, "newPassword");
+  if (old_password.empty() || new_password.size() < 6) {
+    cb(error_response("Invalid password data", drogon::k400BadRequest));
+    return;
+  }
+
+  try {
+    auto c = db.connect();
+    pqxx::work tx(c);
+    auto rows = tx.exec_params(
+        "select password_hash,password_salt from users where id=$1", user_id);
+    if (rows.empty()) {
+      cb(error_response("User not found", drogon::k404NotFound));
+      return;
+    }
+    const auto salt = rows[0]["password_salt"].as<std::string>();
+    const auto expected = rows[0]["password_hash"].as<std::string>();
+    if (sha256(salt + old_password) != expected) {
+      cb(error_response("Current password is incorrect", drogon::k401Unauthorized));
+      return;
+    }
+    set_user_password(tx, user_id, new_password);
+    tx.commit();
+    cb(json_response(ok_message("Password changed")));
+  } catch (const std::exception &e) {
+    cb(error_response(e.what(), drogon::k500InternalServerError));
+  }
+}
+
+void auth_change_email_send(const drogon::HttpRequestPtr &req, Callback &&cb)
+{
+  std::string user_id;
+  if (!require_auth(req, cb, user_id)) return;
+  const auto body = req->getJsonObject();
+  if (!body) {
+    cb(error_response("Invalid JSON", drogon::k400BadRequest));
+    return;
+  }
+  const auto new_email = body_string(*body, "newEmail");
+  if (new_email.empty()) {
+    cb(error_response("Email required", drogon::k400BadRequest));
+    return;
+  }
+
+  try {
+    auto c = db.connect();
+    pqxx::work tx(c);
+    auto existing = tx.exec_params(
+        "select id from users where lower(email)=lower($1)", new_email);
+    if (!existing.empty()) {
+      cb(error_response("Email already in use", drogon::k400BadRequest));
+      return;
+    }
+    const auto code = verification_code();
+    store_verification_code(tx, new_email, "change_email", code, user_id);
+    const bool email_sent =
+        send_verification_email(new_email, "Смена email Monefy", code);
+    tx.commit();
+    cb(json_response(ok_message("Verification code sent to the new email", code,
+                                email_sent)));
+  } catch (const std::exception &e) {
+    cb(error_response(e.what(), drogon::k500InternalServerError));
+  }
+}
+
+void auth_change_email_confirm(const drogon::HttpRequestPtr &req, Callback &&cb)
+{
+  std::string user_id;
+  if (!require_auth(req, cb, user_id)) return;
+  const auto body = req->getJsonObject();
+  if (!body) {
+    cb(error_response("Invalid JSON", drogon::k400BadRequest));
+    return;
+  }
+  const auto new_email = body_string(*body, "newEmail");
+  const auto code = body_string(*body, "code");
+  if (new_email.empty() || code.empty()) {
+    cb(error_response("Invalid confirmation data", drogon::k400BadRequest));
+    return;
+  }
+
+  try {
+    auto c = db.connect();
+    pqxx::work tx(c);
+    if (!consume_verification_code(tx, new_email, "change_email", code, user_id)) {
+      cb(error_response("Invalid or expired code", drogon::k400BadRequest));
+      return;
+    }
+    auto clash = tx.exec_params(
+        "select id from users where lower(email)=lower($1) and id<>$2::uuid",
+        new_email, user_id);
+    if (!clash.empty()) {
+      cb(error_response("Email already in use", drogon::k400BadRequest));
+      return;
+    }
+    tx.exec_params("update users set email=$1 where id=$2", new_email, user_id);
+    auto rows = tx.exec_params(
+        "select id,email,first_name,last_name,phone,created_at from users where id=$1",
+        user_id);
+    tx.commit();
+    Json::Value out;
+    out["ok"] = true;
+    out["user"] = user_json(rows[0]);
+    cb(json_response(out));
+  } catch (const std::exception &e) {
+    cb(error_response(e.what(), drogon::k500InternalServerError));
+  }
+}
+
+bool valid_feedback_issue(const std::string &issue_type)
+{
+  return issue_type == "card" || issue_type == "transfer" ||
+         issue_type == "login" || issue_type == "crash" ||
+         issue_type == "balance" || issue_type == "other";
+}
+
+void submit_feedback(const drogon::HttpRequestPtr &req, Callback &&cb)
+{
+  std::string user_id;
+  if (!require_auth(req, cb, user_id)) return;
+  const auto body = req->getJsonObject();
+  if (!body) {
+    cb(error_response("Invalid JSON", drogon::k400BadRequest));
+    return;
+  }
+  const auto issue_type = body_string(*body, "issueType");
+  const auto message = body_string(*body, "message");
+  if (!valid_feedback_issue(issue_type)) {
+    cb(error_response("Invalid issue type", drogon::k400BadRequest));
+    return;
+  }
+  if (issue_type == "other" && message.empty()) {
+    cb(error_response("Message required", drogon::k400BadRequest));
+    return;
+  }
+  try {
+    auto c = db.connect();
+    pqxx::work tx(c);
+    auto user_rows = tx.exec_params(
+        "select email, first_name, last_name from users where id=$1", user_id);
+    if (user_rows.empty()) {
+      cb(error_response("User not found", drogon::k404NotFound));
+      return;
+    }
+    const auto email = user_rows[0]["email"].as<std::string>();
+    const auto first = user_rows[0]["first_name"].as<std::string>();
+    const auto last = user_rows[0]["last_name"].as<std::string>();
+    const auto name = last.empty() ? first : first + " " + last;
+    auto rows = tx.exec_params(
+        "insert into feedback_reports(user_id, user_email, user_name, issue_type, "
+        "message) values($1, $2, $3, $4, $5) returning id",
+        user_id, email, name, issue_type, message);
+    tx.commit();
+    Json::Value out;
+    out["ok"] = true;
+    out["id"] = static_cast<Json::Int64>(rows[0]["id"].as<long long>());
+    cb(json_response(out));
+  } catch (const std::exception &e) {
+    cb(error_response(e.what(), drogon::k500InternalServerError));
+  }
+}
+
 } // namespace
 
 int main()
 {
+  curl_global_init(CURL_GLOBAL_DEFAULT);
   try {
     db.init_schema();
   } catch (const std::exception &e) {
@@ -865,6 +1209,36 @@ int main()
         auth_update_profile(req, std::move(cb));
       },
       {Patch});
+  app().registerHandler(
+      "/api/auth/forgot-password/send-code",
+      [](const HttpRequestPtr &req, Callback &&cb) {
+        auth_forgot_send_code(req, std::move(cb));
+      },
+      {Post});
+  app().registerHandler(
+      "/api/auth/forgot-password/reset",
+      [](const HttpRequestPtr &req, Callback &&cb) {
+        auth_forgot_reset(req, std::move(cb));
+      },
+      {Post});
+  app().registerHandler(
+      "/api/auth/change-password",
+      [](const HttpRequestPtr &req, Callback &&cb) {
+        auth_change_password(req, std::move(cb));
+      },
+      {Post});
+  app().registerHandler(
+      "/api/auth/change-email/send-code",
+      [](const HttpRequestPtr &req, Callback &&cb) {
+        auth_change_email_send(req, std::move(cb));
+      },
+      {Post});
+  app().registerHandler(
+      "/api/auth/change-email/confirm",
+      [](const HttpRequestPtr &req, Callback &&cb) {
+        auth_change_email_confirm(req, std::move(cb));
+      },
+      {Post});
   app().registerHandler(
       "/api/cards",
       [](const HttpRequestPtr &req, Callback &&cb) {
@@ -959,7 +1333,14 @@ int main()
         external_transfer(req, std::move(cb));
       },
       {Post});
+  app().registerHandler(
+      "/api/feedback",
+      [](const HttpRequestPtr &req, Callback &&cb) {
+        submit_feedback(req, std::move(cb));
+      },
+      {Post});
 
   app().addListener("0.0.0.0", std::stoi(env_or("MONEFY_API_PORT", "8080")));
   app().run();
+  curl_global_cleanup();
 }

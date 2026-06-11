@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useEffect, useLayoutEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -10,8 +10,11 @@ import {
 } from 'react-native';
 
 import { AnimatedPressable } from '../components/AnimatedPressable';
+import { LoadingButtonContent } from '../components/LoadingButtonContent';
+import { ScreenLoading } from '../components/ScreenLoading';
 import { TOP_UP_CATEGORY } from '../constants/banking';
 import { useAppPreferences } from '../context/AppPreferencesContext';
+import { useScreenTitle } from '../hooks/useScreenTitle';
 import { useSecurity } from '../context/SecurityContext';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { MonefyCore, parseJson } from '../native/monefyCore';
@@ -29,6 +32,7 @@ export function LoanScreen({ navigation }: Props) {
   const [term, setTerm] = useState<number>(12);
   const [cards, setCards] = useState<Card[]>([]);
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
+  const [isLoadingCards, setIsLoadingCards] = useState(true);
   const [loading, setLoading] = useState(false);
 
   const rate = 14.9;
@@ -38,18 +42,18 @@ export function LoanScreen({ navigation }: Props) {
       ? (amt * (1 + rate / 100)) / term
       : 0;
 
-  useLayoutEffect(() => {
-    navigation.setOptions({ title: t('loanTitle') });
-  }, [navigation, t]);
+  useScreenTitle('loanTitle');
 
   useEffect(() => {
+    setIsLoadingCards(true);
     MonefyCore.getCardsJson()
       .then(json => {
         const data = parseJson<Card[]>(json);
         setCards(data);
         setSelectedCard(data[0] ?? null);
       })
-      .catch(() => setCards([]));
+      .catch(() => setCards([]))
+      .finally(() => setIsLoadingCards(false));
   }, []);
 
   const apply = () => {
@@ -76,7 +80,7 @@ export function LoanScreen({ navigation }: Props) {
         });
         await MonefyCore.addIncomeJson(payload);
         Alert.alert(t('loanApprovedTitle'), t('loanApprovedBody'), [
-          { text: 'OK', onPress: () => navigation.goBack() },
+          { text: t('ok'), onPress: () => navigation.goBack() },
         ]);
       } catch (e: unknown) {
         Alert.alert(t('error'), String(e));
@@ -97,7 +101,7 @@ export function LoanScreen({ navigation }: Props) {
         value={amount}
         onChangeText={setAmount}
         keyboardType="decimal-pad"
-        placeholder="0"
+        placeholder={t('amountPlaceholderZero')}
         placeholderTextColor={colors.textMuted}
         style={[
           styles.input,
@@ -144,34 +148,44 @@ export function LoanScreen({ navigation }: Props) {
       </View>
 
       <Text style={[styles.label, { color: colors.text }]}>{t('loanCreditTo')}</Text>
-      {cards.map(card => (
-        <AnimatedPressable
-          key={card.number}
-          variant="tile"
-          onPress={() => setSelectedCard(card)}
-          style={[
-            styles.cardRow,
-            {
-              backgroundColor: colors.card,
-              borderColor:
-                selectedCard?.number === card.number ? colors.brand : colors.border,
-            },
-          ]}>
-          <Text style={[styles.cardNum, { color: colors.text }]}>•••• {card.number.slice(-4)}</Text>
-          <Text style={[styles.cardBal, { color: colors.textMuted }]}>
-            {card.balance.toFixed(2)} ₽
-          </Text>
-        </AnimatedPressable>
-      ))}
+      {isLoadingCards ? (
+        <ScreenLoading minHeight={100} />
+      ) : (
+        cards.map(card => (
+          <AnimatedPressable
+            key={card.number}
+            variant="tile"
+            onPress={() => setSelectedCard(card)}
+            style={[
+              styles.cardRow,
+              {
+                backgroundColor: colors.card,
+                borderColor:
+                  selectedCard?.number === card.number ? colors.brand : colors.border,
+              },
+            ]}>
+            <Text style={[styles.cardNum, { color: colors.text }]}>
+              •••• {card.number.slice(-4)}
+            </Text>
+            <Text style={[styles.cardBal, { color: colors.textMuted }]}>
+              {card.balance.toFixed(2)} ₽
+            </Text>
+          </AnimatedPressable>
+        ))
+      )}
 
       <AnimatedPressable
         variant="primary"
         onPress={apply}
-        disabled={loading}
+        disabled={loading || isLoadingCards}
         style={[styles.applyBtn, { backgroundColor: colors.brand, opacity: loading ? 0.7 : 1 }]}>
-        <Text style={[styles.applyText, { color: colors.inverseText }]}>
-          {loading ? t('saving') : t('loanApply')}
-        </Text>
+        {loading ? (
+          <LoadingButtonContent label={t('saving')} textColor={colors.inverseText} />
+        ) : (
+          <Text style={[styles.applyText, { color: colors.inverseText }]}>
+            {t('loanApply')}
+          </Text>
+        )}
       </AnimatedPressable>
     </ScrollView>
   );

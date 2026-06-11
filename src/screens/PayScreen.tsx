@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useEffect, useLayoutEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -9,9 +9,12 @@ import {
 } from 'react-native';
 
 import { AnimatedPressable } from '../components/AnimatedPressable';
+import { LoadingSpinner } from '../components/LoadingSpinner';
+import { ScreenLoading } from '../components/ScreenLoading';
 import { AppIcon } from '../components/AppIcon';
 import { categoryIconName } from '../constants/categoryGlyphs';
 import { useAppPreferences } from '../context/AppPreferencesContext';
+import { useScreenTitle } from '../hooks/useScreenTitle';
 import { resolveCategoryLabel } from '../i18n/translations';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { MonefyCore } from '../native/monefyCore';
@@ -28,13 +31,14 @@ export function PayScreen({ navigation, route }: Props) {
     [],
   );
   const [customCats, setCustomCats] = useState<CustomCategory[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [payingCard, setPayingCard] = useState<string | null>(null);
 
-  useLayoutEffect(() => {
-    navigation.setOptions({ title: t('navPay') });
-  }, [navigation, t]);
+  useScreenTitle('navPay');
 
   useEffect(() => {
     (async () => {
+      setIsLoading(true);
       try {
         const j = await MonefyCore.getCardsJson();
         setCards(JSON.parse(j) as { number: string; balance: number }[]);
@@ -42,10 +46,12 @@ export function PayScreen({ navigation, route }: Props) {
         setCards([]);
       }
       setCustomCats(await loadCustomCategories());
+      setIsLoading(false);
     })();
   }, []);
 
   const pay = async (cardNumber: string) => {
+    setPayingCard(cardNumber);
     const payload = JSON.stringify({
       amount,
       description,
@@ -60,6 +66,8 @@ export function PayScreen({ navigation, route }: Props) {
       navigation.popToTop();
     } catch (e: unknown) {
       Alert.alert(t('error'), String(e));
+    } finally {
+      setPayingCard(null);
     }
   };
 
@@ -82,22 +90,30 @@ export function PayScreen({ navigation, route }: Props) {
           {amount.toFixed(2)} · {catTitle}
         </Text>
       </View>
-      {cards.map(c => (
+      {isLoading ? (
+        <ScreenLoading minHeight={120} />
+      ) : (
+        cards.map(c => (
         <AnimatedPressable
           key={c.number}
           variant="tile"
+          disabled={payingCard !== null}
           style={[
             styles.row,
             { backgroundColor: colors.card, borderColor: colors.border },
           ]}
           onPress={() => pay(c.number)}>
           <Text style={[styles.num, { color: colors.text }]}>{c.number}</Text>
-          <Text style={[styles.bal, { color: colors.income }]}>
-            {c.balance.toFixed(2)}
-          </Text>
+          {payingCard === c.number ? (
+            <LoadingSpinner size="small" color={colors.brand} />
+          ) : (
+            <Text style={[styles.bal, { color: colors.income }]}>
+              {c.balance.toFixed(2)}
+            </Text>
+          )}
         </AnimatedPressable>
-      ))}
-      {cards.length === 0 ? (
+      )))}
+      {!isLoading && cards.length === 0 ? (
         <Text style={[styles.warn, { color: colors.danger }]}>{t('noCardsWarn')}</Text>
       ) : null}
     </ScrollView>

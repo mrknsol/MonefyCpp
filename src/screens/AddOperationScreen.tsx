@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 
 import { AnimatedPressable } from '../components/AnimatedPressable';
+import { LoadingButtonContent } from '../components/LoadingButtonContent';
+import { ScreenLoading } from '../components/ScreenLoading';
 import { AppIcon } from '../components/AppIcon';
 import { categoryIconName } from '../constants/categoryGlyphs';
 import { TOP_UP_CATEGORY } from '../constants/banking';
@@ -34,7 +36,8 @@ export function AddOperationScreen({ navigation, route }: Props) {
   const [cards, setCards] = useState<Card[]>([]);
   const [categories, setCategories] = useState<UiCategory[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<UiCategory | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   const operationType = route.params?.type || 'expense';
   const presetCategoryId = route.params?.categoryId;
@@ -77,11 +80,20 @@ export function AddOperationScreen({ navigation, route }: Props) {
     navigation.setOptions({
       title: isIncome ? t('topUpLabel') : t('newExpense'),
     });
-  }, [navigation, t, isIncome]);
+  }, [navigation, t, locale, isIncome]);
 
   React.useEffect(() => {
-    loadCards();
-    loadCategories();
+    let active = true;
+    (async () => {
+      setIsLoadingData(true);
+      await Promise.all([loadCards(), loadCategories()]);
+      if (active) {
+        setIsLoadingData(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
   }, [loadCards, loadCategories]);
 
   React.useEffect(() => {
@@ -105,7 +117,7 @@ export function AddOperationScreen({ navigation, route }: Props) {
       return;
     }
 
-    setIsLoading(true);
+    setIsSaving(true);
     try {
       const finalAmount = isIncome ? Math.abs(amt) : -Math.abs(amt);
       const category = isIncome ? TOP_UP_CATEGORY.id : selectedCategory!.id;
@@ -134,7 +146,7 @@ export function AddOperationScreen({ navigation, route }: Props) {
       const err = e instanceof Error ? e.message : String(e);
       Alert.alert(t('error'), err);
     } finally {
-      setIsLoading(false);
+      setIsSaving(false);
     }
   };
 
@@ -167,6 +179,8 @@ export function AddOperationScreen({ navigation, route }: Props) {
               </Text>
             </View>
           </View>
+        ) : isLoadingData ? (
+          <ScreenLoading minHeight={100} />
         ) : (
           <View style={styles.section}>
             <Text style={[styles.label, { color: colors.text }]}>{t('selectCategory')}</Text>
@@ -214,7 +228,9 @@ export function AddOperationScreen({ navigation, route }: Props) {
 
         <View style={styles.section}>
           <Text style={[styles.label, { color: colors.text }]}>{t('selectCard')}</Text>
-          {cards.length === 0 ? (
+          {isLoadingData ? (
+            <ScreenLoading minHeight={80} />
+          ) : cards.length === 0 ? (
             <AnimatedPressable
               variant="tile"
               style={[
@@ -267,7 +283,7 @@ export function AddOperationScreen({ navigation, route }: Props) {
             ]}
             value={amount}
             onChangeText={setAmount}
-            placeholder="0.00"
+            placeholder={t('amountPlaceholder')}
             placeholderTextColor={colors.textMuted}
             keyboardType="decimal-pad"
             autoFocus
@@ -302,7 +318,7 @@ export function AddOperationScreen({ navigation, route }: Props) {
           style={[
             styles.saveButton,
             {
-              backgroundColor: isLoading
+              backgroundColor: isSaving
                 ? colors.textMuted
                 : isIncome
                   ? colors.income
@@ -310,10 +326,12 @@ export function AddOperationScreen({ navigation, route }: Props) {
             },
           ]}
           onPress={save}
-          disabled={isLoading}>
-          <Text style={[styles.saveButtonText, { color: 'white' }]}>
-            {isLoading ? t('saving') : t('save')}
-          </Text>
+          disabled={isSaving || isLoadingData}>
+          {isSaving ? (
+            <LoadingButtonContent label={t('saving')} textColor="#fff" />
+          ) : (
+            <Text style={[styles.saveButtonText, { color: 'white' }]}>{t('save')}</Text>
+          )}
         </AnimatedPressable>
       </ScrollView>
     </KeyboardAvoidingView>

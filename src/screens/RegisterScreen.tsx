@@ -1,3 +1,4 @@
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
 import {
   Alert,
@@ -9,11 +10,15 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnimatedPressable } from '../components/AnimatedPressable';
+import { LoadingButtonContent } from '../components/LoadingButtonContent';
 import { useAppPreferences } from '../context/AppPreferencesContext';
 import { useAuth } from '../context/AuthContext';
+import type { AuthStackParamList } from '../navigation/AuthNavigator';
 import { cardShadow, radii, space } from '../theme/tokens';
 
-export function RegisterScreen({ onLogin }: { onLogin: () => void }) {
+type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
+
+export function RegisterScreen({ navigation }: Props) {
   const { colors, t } = useAppPreferences();
   const { register } = useAuth();
   const insets = useSafeAreaInsets();
@@ -56,7 +61,7 @@ export function RegisterScreen({ onLogin }: { onLogin: () => void }) {
       ]}>
       <View style={[styles.heroBand, { backgroundColor: colors.bankCardStart }]}>
         <View style={[styles.heroGlow, { backgroundColor: colors.bankCardEnd }]} />
-        <Text style={[styles.bankLogo, { color: colors.onBankCard }]}>MONEFY BANK</Text>
+        <Text style={[styles.bankLogo, { color: colors.onBankCard }]}>MONEFY</Text>
         <Text style={[styles.bankSub, { color: 'rgba(255,255,255,0.7)' }]}>
           {t('registerSubtitle')}
         </Text>
@@ -81,7 +86,7 @@ export function RegisterScreen({ onLogin }: { onLogin: () => void }) {
             styles.input,
             { backgroundColor: colors.chip, color: colors.text, borderColor: colors.border },
           ]}
-          placeholder="Email"
+          placeholder={t('emailPlaceholder')}
           placeholderTextColor={colors.textMuted}
           value={email}
           onChangeText={setEmail}
@@ -124,12 +129,22 @@ export function RegisterScreen({ onLogin }: { onLogin: () => void }) {
           style={[styles.button, { backgroundColor: colors.brand }]}
           onPress={handleRegister}
           disabled={isLoading}>
-          <Text style={[styles.buttonText, { color: colors.inverseText }]}>
-            {isLoading ? t('saving') : t('signUpLink')}
-          </Text>
+          {isLoading ? (
+            <LoadingButtonContent
+              label={t('saving')}
+              textColor={colors.inverseText}
+            />
+          ) : (
+            <Text style={[styles.buttonText, { color: colors.inverseText }]}>
+              {t('signUpLink')}
+            </Text>
+          )}
         </AnimatedPressable>
 
-        <AnimatedPressable variant="soft" style={styles.footer} onPress={onLogin}>
+        <AnimatedPressable
+          variant="soft"
+          style={styles.footer}
+          onPress={() => navigation.navigate('Login')}>
           <Text style={[styles.link, { color: colors.brand }]}>{t('signIn')}</Text>
         </AnimatedPressable>
       </View>

@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useLayoutEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -10,10 +10,12 @@ import {
 } from 'react-native';
 
 import { AnimatedPressable } from '../components/AnimatedPressable';
+import { LoadingButtonContent } from '../components/LoadingButtonContent';
 import { AppIcon } from '../components/AppIcon';
 import { EXPENSE_CATEGORIES } from '../constants/categories';
 import { categoryIconName } from '../constants/categoryGlyphs';
 import { useAppPreferences } from '../context/AppPreferencesContext';
+import { useScreenTitle } from '../hooks/useScreenTitle';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { MonefyCore } from '../native/monefyCore';
 
@@ -27,10 +29,9 @@ export function AddCustomCategoryScreen({ navigation }: Props) {
   const { colors, t } = useAppPreferences();
   const [label, setLabel] = useState('');
   const [picked, setPicked] = useState(ICON_PRESETS[0]);
+  const [isSaving, setIsSaving] = useState(false);
 
-  useLayoutEffect(() => {
-    navigation.setOptions({ title: t('addCategoryTitle') });
-  }, [navigation, t]);
+  useScreenTitle('addCategoryTitle');
 
   const save = async () => {
     const name = label.trim();
@@ -55,11 +56,14 @@ export function AddCustomCategoryScreen({ navigation }: Props) {
       iconName: picked.iconName,
       iconColor: picked.color,
     });
+    setIsSaving(true);
     try {
       await MonefyCore.addCustomCategoryJson(payload);
       navigation.goBack();
     } catch (e: unknown) {
       Alert.alert(t('error'), String(e));
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -80,7 +84,7 @@ export function AddCustomCategoryScreen({ navigation }: Props) {
         ]}
         value={label}
         onChangeText={setLabel}
-        placeholder="Coffee"
+        placeholder={t('categoryNameExample')}
         placeholderTextColor={colors.textSecondary}
       />
 
@@ -114,9 +118,17 @@ export function AddCustomCategoryScreen({ navigation }: Props) {
 
       <AnimatedPressable
         variant="primary"
-        style={[styles.save, { backgroundColor: colors.accentMuted }]}
+        disabled={isSaving}
+        style={[
+          styles.save,
+          { backgroundColor: colors.accentMuted, opacity: isSaving ? 0.7 : 1 },
+        ]}
         onPress={save}>
-        <Text style={styles.saveTxt}>{t('save')}</Text>
+        {isSaving ? (
+          <LoadingButtonContent label={t('saving')} textColor="#fff" />
+        ) : (
+          <Text style={styles.saveTxt}>{t('save')}</Text>
+        )}
       </AnimatedPressable>
     </ScrollView>
   );

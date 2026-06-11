@@ -11,12 +11,13 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAppPreferences } from '../context/AppPreferencesContext';
+import { TAB_LABEL_KEYS } from '../navigation/tabLabelKeys';
 import { cardShadow, radii, space } from '../theme/tokens';
 
 const HORIZONTAL_MARGIN = space.lg;
 
 export function PremiumTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
-  const { colors } = useAppPreferences();
+  const { colors, t } = useAppPreferences();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const progress = useRef(new Animated.Value(state.index)).current;
@@ -70,10 +71,12 @@ export function PremiumTabBar({ state, descriptors, navigation }: BottomTabBarPr
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
           const focused = state.index === index;
-          const label =
-            typeof options.tabBarLabel === 'string'
+          const labelKey = TAB_LABEL_KEYS[route.name];
+          const label = labelKey
+            ? t(labelKey)
+            : typeof options.tabBarLabel === 'string'
               ? options.tabBarLabel
-              : options.title ?? route.name;
+              : (options.title ?? route.name);
           const color = focused ? colors.brand : colors.textMuted;
 
           const onPress = () => {

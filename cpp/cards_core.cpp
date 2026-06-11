@@ -19,4 +19,4 @@ double withdraw_amount(double balance, double amount)
   return finance_core::subtract_amounts(balance, amount);
 }
 
-} // namespace cards_core
+} 

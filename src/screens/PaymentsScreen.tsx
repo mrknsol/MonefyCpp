@@ -4,6 +4,8 @@ import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnimatedPressable } from '../components/AnimatedPressable';
+import { LoadingButtonContent } from '../components/LoadingButtonContent';
+import { ScreenLoading } from '../components/ScreenLoading';
 import { AppIcon } from '../components/AppIcon';
 import { SpendingOrbitCard, type SpendingOrbitItem } from '../components/FinancialVisualCards';
 import { EXPENSE_CATEGORIES } from '../constants/categories';
@@ -26,14 +28,20 @@ export function PaymentsScreen() {
   const [customCategories, setCustomCategories] = useState<CustomCategory[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isCreatingCustom, setIsCreatingCustom] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(true);
 
   const reloadCustomCategories = useCallback(async () => {
-    const [categories, txJson] = await Promise.all([
-      loadCustomCategories(),
-      MonefyCore.getTransactionsJson(),
-    ]);
-    setCustomCategories(categories);
-    setTransactions(parseJson<Transaction[]>(txJson));
+    setIsLoadingData(true);
+    try {
+      const [categories, txJson] = await Promise.all([
+        loadCustomCategories(),
+        MonefyCore.getTransactionsJson(),
+      ]);
+      setCustomCategories(categories);
+      setTransactions(parseJson<Transaction[]>(txJson));
+    } finally {
+      setIsLoadingData(false);
+    }
   }, []);
 
   const spendingOrbit = useMemo<SpendingOrbitItem[]>(() => {
@@ -181,7 +189,11 @@ export function PaymentsScreen() {
       <Text style={[styles.title, { color: colors.text }]}>{t('paymentsTitle')}</Text>
       <Text style={[styles.subtitle, { color: colors.textMuted }]}>{t('paymentsSubtitle')}</Text>
 
-      <SpendingOrbitCard items={spendingOrbit} colors={colors} t={t} padded={false} />
+      {isLoadingData ? (
+        <ScreenLoading minHeight={100} />
+      ) : (
+        <SpendingOrbitCard items={spendingOrbit} colors={colors} t={t} padded={false} />
+      )}
 
       <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
         {t('paymentsServicesSection').toUpperCase()}
@@ -296,9 +308,13 @@ export function PaymentsScreen() {
               { backgroundColor: isCreatingCustom ? colors.textMuted : colors.brand },
             ]}
             onPress={openCustomCategoryPayment}>
-            <Text style={[styles.customPaymentButtonText, { color: colors.inverseText }]}>
-              {isCreatingCustom ? t('saving') : t('save')}
-            </Text>
+            {isCreatingCustom ? (
+              <LoadingButtonContent label={t('saving')} textColor={colors.inverseText} />
+            ) : (
+              <Text style={[styles.customPaymentButtonText, { color: colors.inverseText }]}>
+                {t('save')}
+              </Text>
+            )}
           </AnimatedPressable>
         </View>
       </View>

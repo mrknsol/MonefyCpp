@@ -10,6 +10,7 @@ import {
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
 import { AnimatedPressable } from '../components/AnimatedPressable';
+import { ScreenLoading } from '../components/ScreenLoading';
 import { BankCardVisual } from '../components/BankCardVisual';
 import { useAppPreferences } from '../context/AppPreferencesContext';
 import { useAuth } from '../context/AuthContext';
@@ -22,13 +23,17 @@ export function ProfileAccountsSection() {
   const { colors, t } = useAppPreferences();
   const navigation = useNavigation<any>();
   const [cards, setCards] = useState<Card[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const reload = useCallback(async () => {
+    setIsLoading(true);
     try {
       const json = await MonefyCore.getCardsJson();
       setCards(parseJson<Card[]>(json));
     } catch {
       setCards([]);
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
@@ -51,7 +56,8 @@ export function ProfileAccountsSection() {
         <View>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('myCards')}</Text>
           <Text style={[styles.sectionHint, { color: colors.textMuted }]}>
-            {cards.length} {t('cardsCount')} · {totalBalance.toFixed(2)} ₽
+            {cards.length} {t('cardsCount')} · {totalBalance.toFixed(2)}
+            {t('balanceCurrencySuffix')}
           </Text>
         </View>
         <AnimatedPressable variant="soft" onPress={() => navigation.navigate('Cards')}>
@@ -59,7 +65,9 @@ export function ProfileAccountsSection() {
         </AnimatedPressable>
       </View>
 
-      {cards.length === 0 ? (
+      {isLoading && cards.length === 0 ? (
+        <ScreenLoading minHeight={100} />
+      ) : cards.length === 0 ? (
         <AnimatedPressable
           variant="tile"
           onPress={() => navigation.navigate('AddCard')}

@@ -1,9 +1,10 @@
-# Monefy Bank — Final Project Report
+# Monefy — Final Project Report
 
 **Course:** Advanced Language Program Design (C++)  
+**Instructor:** Xuemiao Xu  
 **Project:** Cross-platform mobile banking application (React Native + C++ backend)  
 **Document type:** Full final report (~4,000 words)  
-**Date:** May 27, 2026  
+**Date:** June 4, 2026  
 
 ---
 
@@ -21,7 +22,7 @@
 
 ## Abstract
 
-Personal finance and mobile banking applications must balance **security**, **clarity**, and **speed**. Many educational projects stop at a UI mockup; commercial apps often depend on third-party cloud infrastructure, which raises privacy concerns. **Monefy Bank** (repository: *MonefyCppRn*) addresses both gaps: it is a working end-to-end system with authentication, multi-card management, categorized transactions, transfers, service payments, statistics, localization, and payment protection via PIN and biometrics.
+Personal finance and mobile banking applications must balance **security**, **clarity**, and **speed**. Many educational projects stop at a UI mockup; commercial apps often depend on third-party cloud infrastructure, which raises privacy concerns. **Monefy** (repository: *MonefyCppRn*) addresses both gaps: it is a working end-to-end system with authentication, multi-card management, categorized transactions, transfers, service payments, statistics, localization, account-security flows (forgot password, change password, change email with verification code), app unlock, and payment protection via PIN and biometrics.
 
 The solution uses a **three-tier architecture**: a React Native (TypeScript) presentation layer, a **C++ REST API** (Drogon framework) as the application server, and **PostgreSQL** for durable financial data. A distinctive academic requirement is **C++ in the business-logic path**. The mobile UI calls a stable **`MonefyCore` facade** whose method names match an earlier desktop/WPF design; the current TypeScript implementation delegates to REST endpoints while preserving JSON contracts. In parallel, the repository retains a **shared native C++ engine** (`cpp/`) with JNI (Android) and Objective-C++ (iOS) bridges for offline or hybrid deployment—JSON file persistence under per-user directories, mutex-protected `MonefyStore`, and domain modules `finance_core` and `cards_core`.
 
@@ -52,7 +53,7 @@ Appendix A — Source code listings (from repository)
 
 ## 1. Executive Summary
 
-**Monefy Bank** is a cross-platform mobile banking prototype developed as a university software engineering project. The product simulates core retail-banking workflows: user registration and login, management of multiple bank cards, recording income and expenses by category, transfers between the user’s own cards and to other users’ cards, utility and custom service payments, loan simulation, spending statistics, multi-language interface, and confirmation of sensitive operations with a payment PIN and optional Face ID / Touch ID.
+**Monefy** is a cross-platform mobile banking prototype developed as a university software engineering project. The product simulates core retail-banking workflows: user registration and login, account recovery, verified email changes, password changes, management of multiple bank cards, recording income and expenses by category, transfers between the user’s own cards and to other users’ cards, utility and custom service payments, loan simulation, spending statistics, multi-language interface, and confirmation of sensitive operations with a payment PIN and optional Face ID / Touch ID.
 
 Architecturally, the live deployment path is:
 
@@ -72,7 +73,7 @@ Key outcomes for the course: demonstrated **cross-platform mobile development**,
 
 Managing personal finances has become more difficult as digital payments and subscriptions multiply. Users expect to see balances instantly, pay bills with few taps, categorize spending, and transfer money safely. Developers face a second problem: maintaining **two platform codebases** (Android and iOS) often leads to inconsistent business rules and slower delivery.
 
-Educational projects frequently implement only static screens. **Monefy Bank** was built to show a **working system**: persisted accounts, session tokens, atomic transfers, and a polished mobile UI—not merely a design comp.
+Educational projects frequently implement only static screens. **Monefy** was built to show a **working system**: persisted accounts, session tokens, atomic transfers, and a polished mobile UI—not merely a design comp.
 
 ### 2.2 Product vision
 
@@ -89,7 +90,7 @@ The project began with an **offline-first** narrative (see team draft): all core
 - Design **REST endpoints** and a **normalized SQL schema** for money operations.  
 - Practice **authentication** (salted password hashes, bearer session tokens).  
 - Deliver **internationalization** (10 locales) and accessible financial flows.  
-- Integrate **biometrics** and PIN gating for payments.  
+- Integrate **biometrics**, PIN gating, and app-unlock flows for payments and account access.  
 - Document architecture, testing, and team process for academic review.
 
 ---
@@ -127,7 +128,7 @@ The project began with an **offline-first** narrative (see team draft): all core
 - **`AppPreferencesProvider`** — theme (light/dark/system), locale, date format; persisted locally.  
 - **`AuthProvider`** — current user, login/register/logout, **switch account** flow.  
 
-When `user` is non-null, **`SecurityProvider`** and **`NavigationContainer`** mount **`RootNavigator`** (main app). Otherwise **`AuthNavigator`** shows login, register, or account picker after “Switch account.”
+`NavigationContainer` wraps both authenticated and unauthenticated navigation. When `user` is non-null, **`SecurityProvider`** mounts **`RootNavigator`** (main app). Otherwise **`AuthNavigator`** shows login, register, forgot-password, or account picker after “Switch account.”
 
 ```tsx
 // App.tsx — auth gate and provider tree
@@ -138,21 +139,21 @@ function AppContent() {
   if (!ready || isLoading) {
     return (
       <View style={[styles.boot, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.accentMuted} />
+        <LoadingSpinner size="large" color={colors.brand} />
       </View>
     );
   }
 
-  if (!user) {
-    return <AuthNavigator />;
-  }
-
   return (
-    <SecurityProvider>
-      <NavigationContainer>
-        <RootNavigator />
-      </NavigationContainer>
-    </SecurityProvider>
+    <NavigationContainer>
+      {user ? (
+        <SecurityProvider>
+          <RootNavigator />
+        </SecurityProvider>
+      ) : (
+        <AuthNavigator />
+      )}
+    </NavigationContainer>
   );
 }
 ```
@@ -161,9 +162,9 @@ function AppContent() {
 
 | Layer | Component | Role |
 |--------|-----------|------|
-| Auth | `AuthNavigator` | Login, Register, `SwitchAccountScreen` |
+| Auth | `AuthNavigator` | Login, Register, Forgot Password, `SwitchAccountScreen` |
 | Tabs | `MainTabNavigator` | Home, Payments, Statistics, Profile |
-| Stack | `RootNavigator` | Cards, add/edit card, operations, transfer, loan, messages, settings, PIN setup, etc. |
+| Stack | `RootNavigator` | Cards, add/edit card, operations, transfer, loan, messages, settings, PIN setup, change email/password, etc. |
 
 **React Navigation** (native stack + bottom tabs) drives transitions. Stack screens often use `fade_from_bottom` (~260 ms). **`PremiumTabBar`** adds an animated indicator for the active tab.
 
@@ -280,6 +281,16 @@ create table if not exists transactions (
   payment_card text not null,
   operation_date date not null default current_date
 );
+
+create table if not exists email_verification_codes (
+  id bigserial primary key,
+  user_id uuid references users(id) on delete cascade,
+  email text not null,
+  purpose text not null,
+  code_hash text not null,
+  expires_at timestamptz not null,
+  consumed_at timestamptz
+);
 ```
 
 - **`users`** — UUID primary key, unique email, `password_hash` + `password_salt`, names, optional phone, `created_at`.  
@@ -287,7 +298,8 @@ create table if not exists transactions (
 - **`cards`** — per user: PAN, holder names, expiry, CVV, `balance` (numeric 14,2).  
 - **`categories`** — seeded expense/income types (Pets, Restaurant, Transport, TopUp, Transfer, …) with icon metadata.  
 - **`transactions`** — amount (negative = expense), category, description, icons, `payment_card`, `operation_date`.  
-- **`transfers`** — internal card-to-card and external (another user’s card) with status and timestamps.
+- **`transfers`** — internal card-to-card and external (another user’s card) with status and timestamps.  
+- **`email_verification_codes`** — short-lived hashed confirmation codes for forgot-password and change-email flows; records are purpose-scoped, expire automatically by validation logic, and are marked consumed after successful use.
 
 Passwords are **never stored in plain text**. Registration hashes password + salt; login recomputes and compares.
 
@@ -300,7 +312,7 @@ Passwords are **never stored in plain text**. Registration hashes password + sal
 | `@monefy/savedAccounts` | Up to 8 accounts for quick switch (id, email, name, token, lastUsedAt) |
 | `recent_payments` | Last service payment targets per user |
 | `@monefy/locale`, theme, dateFormat | UI preferences |
-| `@monefy/security/<userId>` | PIN settings, Face ID flag |
+| `@monefy/security/<userId>` | PIN settings, Face ID flag, local app-unlock state source |
 
 Saved tokens enable fast account switching until expiry; logout removes the current account from the saved list.
 
@@ -310,12 +322,14 @@ Under `documents_dir/user_<id>/`: `cards.json`, `transactions.json`, `custom_cat
 
 ### 5.4 API client
 
-`src/api/client.ts` sets base URL (`10.0.2.2:8080` Android emulator, `localhost` iOS simulator; LAN IP for physical devices). Authenticated calls attach `Authorization: Bearer <token>`.
+`src/api/client.ts` sets the API base URL from the platform and development network. Android emulator uses `10.0.2.2:8080`; iOS and physical devices use the configured LAN host in `src/config/devApiHost.ts` (for example `172.20.10.2:8080` when running through an iPhone hotspot). Authenticated calls attach `Authorization: Bearer <token>`.
 
 ```typescript
 // src/api/client.ts — bearer token on each request
 export const API_BASE_URL =
-  Platform.OS === 'android' ? 'http://10.0.2.2:8080' : 'http://localhost:8080';
+  Platform.OS === 'android'
+    ? 'http://10.0.2.2:8080'
+    : `http://${DEV_MACHINE_HOST}:${DEV_API_PORT}`;
 
 export async function apiRequest<T>(
   path: string,
@@ -351,6 +365,12 @@ export async function apiRequest<T>(
 **User story — Switch account:** From profile, user chooses “Switch account.” Current session is persisted in saved list; token cleared; `SwitchAccountScreen` lists accounts with last-used order. Tap restores token and validates via `GET /api/auth/profile`. Invalid token removes that saved row.
 
 **User story — Logout:** Clears token and user; removes current account from saved list; returns to login.
+
+**User story — Forgot password:** From the login screen, the user enters an email address and receives a six-digit verification code. After entering the code and a new password, the backend validates the code purpose (`forgot_password`), checks expiry/consumption, hashes the new password with a fresh salt, and allows the user to sign in again.
+
+**User story — Change password:** From profile, an authenticated user can change the password by entering the current password and a new one. If the user does not remember the current password, the same verified forgot-password flow can be opened from settings with the current email prefilled.
+
+**User story — Change email:** From profile, the user enters a new email, receives a verification code on that new address, and confirms the change in a second step. The app then updates the in-memory user, persisted profile, and saved-account entry so account switching remains correct.
 
 ```typescript
 // src/context/AuthContext.tsx — restore session from saved account
@@ -416,7 +436,13 @@ const onTransfer = () => {
 
 - **Loan** — simulated application: amount, term, rate, credit to selected card.  
 - **Messages** — inbox (welcome, PIN reminder, rates).  
-- **Profile** — phone binding with **`PhoneCountryPicker`** (`phoneCountries.ts`, locale-aware default), theme, language, feedback form, currency rates panel on home.
+- **Profile** — phone binding with **`PhoneCountryPicker`** (`phoneCountries.ts`, locale-aware default), account security (change email, change password, PIN/Face ID), theme, language, feedback form, support messages, saved-account switching, and currency rates panel on home.
+
+### 6.6.1 App unlock and PIN management
+
+The security settings are user-scoped and stored under `@monefy/security/<userId>`. If a PIN exists, the app requires unlock when the authenticated app opens or returns from background. When Face ID / Touch ID is enabled and available, biometric authentication is attempted first; if it fails or is cancelled, the user can unlock with the PIN pad.
+
+Changing an existing PIN is also protected: the user must either pass Face ID or enter the current PIN before choosing the new PIN length and confirming the new code. This mirrors common mobile banking patterns where changing an authentication factor requires proving the current one first.
 
 ### 6.7 Facade pattern (why it matters)
 
@@ -427,6 +453,7 @@ Course materials referenced a desktop **MonefyCore** API. Mobile screens were wr
 The Drogon server in `backend/monefy-bank-api/src/main.cpp` groups handlers by domain. Typical groups (exact paths may vary by build; consult source for authoritative routes):
 
 - **Authentication** — register, login, logout, profile; session token issuance and validation middleware on protected routes.  
+- **Account security** — forgot-password code sending/reset, authenticated password change, change-email code sending/confirmation; verification codes are stored hashed and purpose-scoped.  
 - **Cards** — list/create/update/delete for the authenticated `user_id`; balance returned as numeric JSON.  
 - **Transactions** — list with optional day filter, create expense/income, delete by id; category and icon fields stored for statistics UI.  
 - **Categories** — built-in seed data plus user-defined custom categories.  
@@ -501,6 +528,8 @@ bool MonefyStore::add_expense_transaction(const json &t, std::string &error)
 - **`AnimatedPressable`** — scale/opacity on taps.  
 - **`PremiumTabBar`** — sliding active indicator.  
 - **`BankCardVisual`** — 3D flip.  
+- **Loading states** — `LoadingSpinner`, `LoadingButtonContent`, and `ScreenLoading` standardize waiting states for boot, data loading, form submission, transfer recipient lookup, and row-level actions.  
+- **PIN pad animation** — `PinPadModal` uses animated dots, a shake response for wrong PINs, and step badges during setup/confirmation.  
 - Animations are intentionally calm; no distracting full-screen effects.
 
 ### 8.3 Icons
@@ -513,6 +542,8 @@ bool MonefyStore::add_expense_transaction(const json &t, std::string &error)
 - **`DICT`** in `translations.ts` with English fallback in `t()`.  
 - **`BUILTIN_CATEGORY_LABELS`** localize category names.  
 - **`formatDayForPreferences`** maps locale to BCP 47 for `Intl` date formatting.
+- **Account-security localization** — `accountSecurityLocales.ts` extends non-English locales for recently added profile, change-email, change-password, PIN, and app-unlock copy.  
+- **Navigation text refresh** — `useScreenTitle` and `PremiumTabBar` resolve labels from translation keys, so stack titles and bottom-tab labels update after changing language without restarting the app.
 
 ---
 
@@ -526,11 +557,13 @@ bool MonefyStore::add_expense_transaction(const json &t, std::string &error)
 | Device | AsyncStorage for token (demo); production should use Keychain/Keystore |
 | Payments | 4–6 digit PIN in `SecurityContext`; optional biometrics after setup |
 | Transfers | `requirePaymentAuth` before executing transfer APIs |
+| App entry | If PIN exists, app unlock is required after login/open and when returning from background |
+| Account changes | Password reset and email change require short-lived email verification codes |
 
-The app **fails closed**: missing PIN blocks sensitive actions; expired saved-account tokens are purged on failed profile fetch.
+The app **fails closed** for sensitive actions: wrong PIN clears the modal input and blocks the action; failed biometrics falls back to PIN; expired saved-account tokens are purged on failed profile fetch. For account recovery, verification codes are not stored as plain text; the backend stores hashes and checks purpose, expiry, and consumption.
 
 ```tsx
-// src/context/SecurityContext.tsx — biometrics or PIN before payment
+// src/context/SecurityContext.tsx — biometrics or PIN before payment/unlock
 const requirePaymentAuth = useCallback(
   (onSuccess: () => void | Promise<void>) => {
     if (!settings?.pin) {
@@ -555,6 +588,8 @@ const requirePaymentAuth = useCallback(
 );
 ```
 
+The same provider also owns app-unlock state. On `AppState` background/inactive transitions, the app marks itself locked; on return to active it prompts Face ID / Touch ID or PIN before showing the authenticated UI again.
+
 ---
 
 ## 10. Testing and Quality Assurance
@@ -578,6 +613,11 @@ const requirePaymentAuth = useCallback(
 | T8 | Dark theme | Colors from dark palette |
 | T9 | Logout | Token cleared; login screen |
 | T10 | API down | Graceful error from `apiRequest` |
+| T11 | Forgot password | Email code accepted once; password changes; old password rejected |
+| T12 | Change email | Code sent to new email; profile and saved account update after confirmation |
+| T13 | App unlock | Returning from background requires Face ID or PIN when PIN is configured |
+| T14 | Change PIN | Existing PIN or Face ID required before saving a new PIN |
+| T15 | Physical iPhone API | `DEV_MACHINE_HOST` points to Mac LAN IP; login reaches C++ API on port 8080 |
 
 ### 10.3 Debugging practices
 
@@ -596,7 +636,8 @@ Team used React Native debugger, Drogon request logs, PostgreSQL inspection via 
 | 3 — Banking API | Drogon server, PostgreSQL schema, auth endpoints | `schema.sql`, register/login/session, cards CRUD |
 | 4 — Feature parity | Wire screens to REST via facade; transfers, categories, payments | `monefyCore.ts` HTTP implementation, transfer endpoints |
 | 5 — Polish | i18n expansion, biometrics, saved accounts, `AppIcon`, statistics | 10 locales, `SwitchAccountScreen`, security flows |
-| 6 — Documentation | Report, manual tests, demo credentials | This document, examiner walkthrough |
+| 6 — Account security | Forgot password, verified email change, password change, app unlock | SMTP sender, verification-code table, `AppLockOverlay`, account-security screens |
+| 7 — Documentation | Report, manual tests, demo credentials | This document, examiner walkthrough |
 
 This phased plan let the course assess **C++ early** (modules and bridge) while the **full banking demo** matured in later sprints without rewriting every screen.
 
@@ -631,7 +672,9 @@ The hardest problems were **cross-platform native builds** and **memory ownershi
 1. **Database:** `docker compose -f backend/monefy-bank-api/docker-compose.yml up -d`  
 2. **API:** CMake build, run `monefy_bank_api` with `MONEFY_DB_CONNECTION` set.  
 3. **Mobile:** `npm install`, `cd ios && pod install`, `npm run ios` or `npm run android`.  
-4. **Networking:** Set `API_BASE_URL` in `src/api/client.ts` for emulator vs physical device.
+4. **Networking:** Set `DEV_MACHINE_HOST` in `src/config/devApiHost.ts` to the Mac LAN IP for physical devices; Android emulator uses `10.0.2.2`, while iOS devices use the configured host.
+
+For email verification features, run the API with SMTP environment variables loaded (for example Gmail app password in `.env`). In development, `MONEFY_EXPOSE_VERIFICATION_CODES=1` can expose codes in API responses/logs for testing without relying on external email delivery.
 
 Demo credentials may appear on `LoginScreen` (e.g. demo@monefy.com) for examiners.
 
@@ -650,11 +693,11 @@ Demo credentials may appear on `LoginScreen` (e.g. demo@monefy.com) for examiner
 
 ## 15. Conclusion
 
-**Monefy Bank** demonstrates a complete mobile banking prototype combining **React Native**, a **C++ REST backend**, and **PostgreSQL**, while retaining a **shared C++ core** suitable for JNI/Objective-C++ integration and offline use. The architecture separates UI, API, and data; the **MonefyCore facade** insulates screens from transport changes.
+**Monefy** demonstrates a complete mobile banking prototype combining **React Native**, a **C++ REST backend**, and **PostgreSQL**, while retaining a **shared C++ core** suitable for JNI/Objective-C++ integration and offline use. The architecture separates UI, API, and data; the **MonefyCore facade** insulates screens from transport changes.
 
-Delivered capabilities—multi-card management, categorized transactions, service payments, transfers, statistics, ten-locale i18n, multi-account switching, PIN and biometrics—map to real user expectations and course goals in advanced C++ and mobile engineering. The project shows how fintech UX (animations, themes, quick actions) can sit on a maintainable TypeScript codebase with **financial invariants enforced in C++ on the server** (and optionally on device).
+Delivered capabilities—multi-card management, categorized transactions, service payments, transfers, statistics, ten-locale i18n, multi-account switching, account recovery, verified email change, password change, app unlock, PIN, and biometrics—map to real user expectations and course goals in advanced C++ and mobile engineering. The project shows how fintech UX (animations, themes, quick actions, loading feedback) can sit on a maintainable TypeScript codebase with **financial invariants enforced in C++ on the server** (and optionally on device).
 
-For defense, we recommend a **ten-minute live demo**: register or use demo login, add a card, record an expense, show statistics update, perform a PIN-gated transfer, switch language in settings, and optionally show PostgreSQL row counts or API logs to prove persistence. **Appendix A** contains the corresponding source listings from the repository (replacing UI screenshots for this document version).
+For defense, we recommend a **ten-minute live demo**: register or use demo login, add a card, record an expense, show statistics update, perform a PIN-gated transfer, switch language in settings, demonstrate app unlock / Face ID, and optionally show PostgreSQL row counts or API logs (including verification-code rows) to prove persistence. **Appendix A** contains the corresponding source listings from the repository (replacing UI screenshots for this document version).
 
 ---
 

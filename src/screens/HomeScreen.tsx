@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnimatedPressable, animateNextLayout } from '../components/AnimatedPressable';
+import { ScreenLoading } from '../components/ScreenLoading';
 import { AppIcon } from '../components/AppIcon';
 import { DecorBackdrop } from '../components/DecorBackdrop';
 import { categoryIconName } from '../constants/categoryGlyphs';
@@ -41,8 +42,10 @@ export function HomeScreen({ navigation }: Props) {
   const [coreVer, setCoreVer] = useState('');
   const [customCats, setCustomCats] = useState<CustomCategory[]>([]);
   const [activeTab, setActiveTab] = useState<'categories' | 'operations'>('categories');
+  const [isLoading, setIsLoading] = useState(true);
 
   const reload = useCallback(async () => {
+    setIsLoading(true);
     try {
       const [b, tJson, trJson, cJson, ver, cc] = await Promise.all([
         MonefyCore.getTotalBalance(),
@@ -60,6 +63,8 @@ export function HomeScreen({ navigation }: Props) {
       setCustomCats(cc);
     } catch (e) {
       console.warn(e);
+    } finally {
+      setIsLoading(false);
     }
   }, [dayIso]);
 
@@ -95,6 +100,17 @@ export function HomeScreen({ navigation }: Props) {
     () => formatDayForPreferences(dayIso, locale, dateDisplayMode),
     [dayIso, locale, dateDisplayMode],
   );
+
+  if (isLoading && cards.length === 0 && balance === 0 && totals.length === 0) {
+    return (
+      <View style={[styles.root, { backgroundColor: colors.background }]}>
+        <DecorBackdrop colors={colors} />
+        <View style={{ flex: 1, paddingTop: insets.top + space.lg }}>
+          <ScreenLoading minHeight={320} />
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>

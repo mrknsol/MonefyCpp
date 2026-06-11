@@ -1,4 +1,4 @@
-# Monefy Bank
+# Monefy
 
 Cross-platform mobile banking application built with **React Native** and a **C++ REST API** backed by **PostgreSQL**. The project demonstrates card management, categorized transactions, transfers, service payments, statistics, multi-language UI, and payment security (PIN / biometrics).
 
@@ -125,9 +125,9 @@ npm run android
 
 ### API URL on a physical device
 
-Emulators use `localhost` or `10.0.2.2` by default (`src/api/client.ts`). On a real phone, set `API_BASE_URL` to your computer’s LAN IP, for example:
+In `src/config/devApiHost.ts`, set `DEV_MACHINE_HOST` to your Mac’s LAN IP (the same address Metro uses in Xcode logs, e.g. `172.20.10.2` when using iPhone hotspot). iOS always uses this host; Android emulator uses `10.0.2.2`.
 
-`http://192.168.1.10:8080`
+Ensure the API is running and listening on all interfaces (`0.0.0.0:8080` — default in `main.cpp`).
 
 ## Scripts
 

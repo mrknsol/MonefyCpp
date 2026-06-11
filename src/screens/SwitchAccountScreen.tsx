@@ -3,6 +3,8 @@ import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnimatedPressable } from '../components/AnimatedPressable';
+import { LoadingSpinner } from '../components/LoadingSpinner';
+import { ScreenLoading } from '../components/ScreenLoading';
 import { useAppPreferences } from '../context/AppPreferencesContext';
 import { useAuth } from '../context/AuthContext';
 import { loadSavedAccounts, type SavedAccount } from '../services/savedAccounts';
@@ -18,9 +20,15 @@ export function SwitchAccountScreen({ onAnotherAccount }: Props) {
   const insets = useSafeAreaInsets();
   const [accounts, setAccounts] = useState<SavedAccount[]>([]);
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [isLoadingList, setIsLoadingList] = useState(true);
 
   const reload = useCallback(async () => {
-    setAccounts(await loadSavedAccounts());
+    setIsLoadingList(true);
+    try {
+      setAccounts(await loadSavedAccounts());
+    } finally {
+      setIsLoadingList(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -59,7 +67,9 @@ export function SwitchAccountScreen({ onAnotherAccount }: Props) {
           { paddingBottom: insets.bottom + space.xl },
         ]}
         showsVerticalScrollIndicator={false}>
-        {accounts.length === 0 ? (
+        {isLoadingList ? (
+          <ScreenLoading minHeight={120} />
+        ) : accounts.length === 0 ? (
           <View
             style={[
               styles.emptyCard,
@@ -98,9 +108,11 @@ export function SwitchAccountScreen({ onAnotherAccount }: Props) {
                   {account.email}
                 </Text>
               </View>
-              <Text style={[styles.chev, { color: colors.textMuted }]}>
-                {loadingId === account.id ? '…' : '›'}
-              </Text>
+              {loadingId === account.id ? (
+                <LoadingSpinner size="small" color={colors.brand} />
+              ) : (
+                <Text style={[styles.chev, { color: colors.textMuted }]}>›</Text>
+              )}
             </AnimatedPressable>
           ))
         )}

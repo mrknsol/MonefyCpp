@@ -1,6 +1,6 @@
-# Monefy Bank C++ API
+# Monefy C++ API
 
-C++ backend for the Monefy Bank mobile app.
+C++ backend for the Monefy mobile app.
 
 ## Stack
 

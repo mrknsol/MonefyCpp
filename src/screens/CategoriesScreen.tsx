@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -9,9 +9,12 @@ import {
 } from 'react-native';
 
 import { AnimatedPressable, animateNextLayout } from '../components/AnimatedPressable';
+import { LoadingSpinner } from '../components/LoadingSpinner';
+import { ScreenLoading } from '../components/ScreenLoading';
 import { AppIcon } from '../components/AppIcon';
 import { categoryIconName } from '../constants/categoryGlyphs';
 import { useAppPreferences } from '../context/AppPreferencesContext';
+import { useScreenTitle } from '../hooks/useScreenTitle';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { MonefyCore, parseJson } from '../native/monefyCore';
 import type { Card, UiCategory } from '../types';
@@ -28,10 +31,10 @@ export function CategoriesScreen({ navigation, route }: Props) {
   );
   const [cards, setCards] = useState<Card[]>([]);
   const [uiCats, setUiCats] = useState<UiCategory[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [processingCard, setProcessingCard] = useState<string | null>(null);
 
-  useLayoutEffect(() => {
-    navigation.setOptions({ title: t('navCategories') });
-  }, [navigation, t]);
+  useScreenTitle('navCategories');
 
   const loadCards = useCallback(async () => {
     try {
@@ -48,12 +51,18 @@ export function CategoriesScreen({ navigation, route }: Props) {
   }, [locale]);
 
   useEffect(() => {
-    loadCards();
-  }, [loadCards]);
-
-  useEffect(() => {
-    loadCats();
-  }, [loadCats]);
+    let active = true;
+    (async () => {
+      setIsLoading(true);
+      await Promise.all([loadCards(), loadCats()]);
+      if (active) {
+        setIsLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [loadCards, loadCats]);
 
   const pickExpense = (cat: UiCategory) => {
     navigation.navigate('Pay', {
@@ -67,11 +76,14 @@ export function CategoriesScreen({ navigation, route }: Props) {
   };
 
   const incomeToCard = async (card: Card) => {
+    setProcessingCard(card.number);
     try {
       await MonefyCore.addIncome(card.number, amount);
       navigation.popToTop();
     } catch (e: unknown) {
       Alert.alert(t('error'), String(e));
+    } finally {
+      setProcessingCard(null);
     }
   };
 
@@ -130,7 +142,9 @@ export function CategoriesScreen({ navigation, route }: Props) {
         {t('sumLabel')}: <Text style={[styles.sumVal, { color: colors.income }]}>{amount.toFixed(2)}</Text>
       </Text>
 
-      {mode === 'expense' ? (
+      {isLoading ? (
+        <ScreenLoading minHeight={180} />
+      ) : mode === 'expense' ? (
         <View style={styles.grid}>
           {uiCats.map(cat => (
             <AnimatedPressable
@@ -164,6 +178,7 @@ export function CategoriesScreen({ navigation, route }: Props) {
               <AnimatedPressable
                 key={card.number}
                 variant="tile"
+                disabled={processingCard !== null}
                 style={[
                   styles.cardRow,
                   { backgroundColor: colors.card, borderColor: colors.border },
@@ -171,9 +186,13 @@ export function CategoriesScreen({ navigation, route }: Props) {
                 ]}
                 onPress={() => incomeToCard(card)}>
                 <Text style={[styles.cardNum, { color: colors.text }]}>{card.number}</Text>
-                <Text style={[styles.cardBal, { color: colors.income }]}>
-                  {card.balance.toFixed(2)}
-                </Text>
+                {processingCard === card.number ? (
+                  <LoadingSpinner size="small" color={colors.income} />
+                ) : (
+                  <Text style={[styles.cardBal, { color: colors.income }]}>
+                    {card.balance.toFixed(2)}
+                  </Text>
+                )}
               </AnimatedPressable>
             ))
           )}

@@ -12,7 +12,11 @@ import {
 } from 'react-native';
 
 import { AnimatedPressable, animateNextLayout } from '../components/AnimatedPressable';
+import { LoadingButtonContent } from '../components/LoadingButtonContent';
+import { LoadingSpinner } from '../components/LoadingSpinner';
+import { ScreenLoading } from '../components/ScreenLoading';
 import { useAppPreferences } from '../context/AppPreferencesContext';
+import { useScreenTitle } from '../hooks/useScreenTitle';
 import { useSecurity } from '../context/SecurityContext';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { MonefyCore, parseJson } from '../native/monefyCore';
@@ -41,16 +45,16 @@ export function TransferScreen({ navigation, route }: Props) {
   const [lookupLoading, setLookupLoading] = useState(false);
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
+  const [isLoadingCards, setIsLoadingCards] = useState(true);
   const [loading, setLoading] = useState(false);
 
   const preselected = route.params?.fromCardNumber;
 
-  useEffect(() => {
-    navigation.setOptions({ title: t('transferTitle') });
-  }, [navigation, t]);
+  useScreenTitle('transferTitle');
 
   useEffect(() => {
     (async () => {
+      setIsLoadingCards(true);
       try {
         const j = await MonefyCore.getCardsJson();
         const data = parseJson<Card[]>(j);
@@ -62,6 +66,8 @@ export function TransferScreen({ navigation, route }: Props) {
         }
       } catch {
         setCards([]);
+      } finally {
+        setIsLoadingCards(false);
       }
     })();
   }, [preselected]);
@@ -173,7 +179,7 @@ export function TransferScreen({ navigation, route }: Props) {
       Alert.alert(
         t('transferSuccess'),
         t('transferSuccessPerson', { name: recipientName }),
-        [{ text: 'OK', onPress: () => navigation.goBack() }],
+        [{ text: t('ok'), onPress: () => navigation.goBack() }],
       );
     } catch (e: unknown) {
       Alert.alert(t('error'), e instanceof Error ? e.message : String(e));
@@ -193,7 +199,9 @@ export function TransferScreen({ navigation, route }: Props) {
   const renderFromCardPicker = () => (
     <View style={styles.section}>
       <Text style={[styles.label, { color: colors.text }]}>{t('fromCard')}</Text>
-      {cards.length === 0 ? (
+      {isLoadingCards ? (
+        <ScreenLoading minHeight={80} />
+      ) : cards.length === 0 ? (
         <Text style={{ color: colors.textMuted }}>{t('noCards')}</Text>
       ) : (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -367,9 +375,12 @@ export function TransferScreen({ navigation, route }: Props) {
                   {t('recipientAccountHint')}
                 </Text>
                 {lookupLoading ? (
-                  <Text style={[styles.lookupText, { color: colors.textMuted }]}>
-                    {t('checkingRecipient')}
-                  </Text>
+                  <View style={styles.lookupLoadingRow}>
+                    <LoadingSpinner size="small" color={colors.brand} />
+                    <Text style={[styles.lookupText, { color: colors.textMuted }]}>
+                      {t('checkingRecipient')}
+                    </Text>
+                  </View>
                 ) : recipientLookup?.found ? (
                   <View
                     style={[
@@ -408,7 +419,7 @@ export function TransferScreen({ navigation, route }: Props) {
                 value={amount}
                 onChangeText={setAmount}
                 keyboardType="decimal-pad"
-                placeholder="0.00"
+                placeholder={t('amountPlaceholder')}
                 placeholderTextColor={colors.textMuted}
               />
             </View>
@@ -441,13 +452,16 @@ export function TransferScreen({ navigation, route }: Props) {
               ]}
               onPress={onTransfer}
               disabled={loading}>
-              <Text style={[styles.submitTxt, { color: colors.inverseText }]}>
-                {loading
-                  ? t('saving')
-                  : mode === 'own'
-                    ? t('transferSubmit')
-                    : t('transferSubmitPerson')}
-              </Text>
+              {loading ? (
+                <LoadingButtonContent
+                  label={t('saving')}
+                  textColor={colors.inverseText}
+                />
+              ) : (
+                <Text style={[styles.submitTxt, { color: colors.inverseText }]}>
+                  {mode === 'own' ? t('transferSubmit') : t('transferSubmitPerson')}
+                </Text>
+              )}
             </AnimatedPressable>
           </>
         )}
@@ -496,6 +510,12 @@ const styles = StyleSheet.create({
   },
   lookupLabel: { fontSize: 11, fontWeight: '700', marginBottom: 4 },
   lookupName: { fontSize: 17, fontWeight: '800', marginBottom: 4 },
+  lookupLoadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    marginTop: space.sm,
+  },
   lookupText: { fontSize: 13, fontWeight: '600', marginTop: space.sm },
   submit: {
     margin: space.lg,

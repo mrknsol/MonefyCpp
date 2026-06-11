@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnimatedPressable, animateNextLayout } from '../components/AnimatedPressable';
+import { ScreenLoading } from '../components/ScreenLoading';
 import { AppIcon } from '../components/AppIcon';
 import { CashflowWaveCard, type CashflowDay } from '../components/FinancialVisualCards';
 import { categoryIconName } from '../constants/categoryGlyphs';
@@ -77,8 +78,10 @@ export function StatisticsScreen() {
   const [period, setPeriod] = useState<StatsPeriod>('month');
   const [activeTab, setActiveTab] = useState<ActivityTab>('expense');
   const [chartTab, setChartTab] = useState<ActivityTab>('expense');
+  const [isLoading, setIsLoading] = useState(true);
 
   const reload = useCallback(async () => {
+    setIsLoading(true);
     try {
       const [balance, txJson, cc] = await Promise.all([
         MonefyCore.getTotalBalance(),
@@ -91,6 +94,8 @@ export function StatisticsScreen() {
     } catch {
       setTotal(0);
       setTransactions([]);
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
@@ -213,6 +218,18 @@ export function StatisticsScreen() {
     );
   };
 
+  if (isLoading && transactions.length === 0) {
+    return (
+      <View
+        style={[
+          styles.container,
+          { backgroundColor: colors.background, paddingTop: insets.top + space.lg },
+        ]}>
+        <ScreenLoading minHeight={320} />
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
@@ -308,6 +325,7 @@ export function StatisticsScreen() {
               title={t('statsChartTitle')}
               emptyText={chartTab === 'expense' ? t('noExpensesPeriod') : t('noIncomePeriod')}
               totalLabel={chartTab === 'expense' ? t('expenseTab') : t('incomeTab')}
+              swipeHint={t('chartSwipeHint')}
               onModeChange={setChartTab}
               colors={{
                 card: colors.card,
@@ -388,6 +406,7 @@ function StatsPieChart({
   title,
   emptyText,
   totalLabel,
+  swipeHint,
   onModeChange,
   colors,
 }: {
@@ -396,6 +415,7 @@ function StatsPieChart({
   title: string;
   emptyText: string;
   totalLabel: string;
+  swipeHint: string;
   onModeChange: (mode: ActivityTab) => void;
   colors: {
     card: string;
@@ -525,7 +545,7 @@ function StatsPieChart({
         <Text style={[styles.chartTitle, { color: colors.text }]}>{title}</Text>
         <View style={styles.chartHeaderRight}>
           <Text style={[styles.chartSubtitle, { color: colors.textMuted }]}>{totalLabel}</Text>
-          <Text style={[styles.chartSwipeHint, { color: colors.textMuted }]}>‹ swipe ›</Text>
+          <Text style={[styles.chartSwipeHint, { color: colors.textMuted }]}>{swipeHint}</Text>
         </View>
       </View>
 

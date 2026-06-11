@@ -106,7 +106,7 @@ function ExpandedContent({
   const muted = 'rgba(255,255,255,0.75)';
   return (
     <>
-      <Text style={[styles.bankLabel, { color: muted }]}>MONEFY BANK</Text>
+      <Text style={[styles.bankLabel, { color: muted }]}>MONEFY</Text>
       <Text style={[styles.balance, { color: theme.text }]}>{balance.toFixed(2)} ₽</Text>
       <Text style={[styles.holderExpanded, { color: theme.text }]} numberOfLines={1}>
         {holder.toUpperCase()}

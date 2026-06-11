@@ -1,6 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useCallback, useLayoutEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -9,9 +9,11 @@ import {
 } from 'react-native';
 
 import { AnimatedPressable } from '../components/AnimatedPressable';
+import { ScreenLoading } from '../components/ScreenLoading';
 import { AppIcon } from '../components/AppIcon';
 import { categoryIconName } from '../constants/categoryGlyphs';
 import { useAppPreferences } from '../context/AppPreferencesContext';
+import { useScreenTitle } from '../hooks/useScreenTitle';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import type { ThemeColors } from '../theme/colors';
 import type { UiCategory } from '../types';
@@ -63,17 +65,21 @@ function CategoryListRow({
 export function AllCategoriesScreen({ navigation }: Props) {
   const { colors, t, locale } = useAppPreferences();
 
-  useLayoutEffect(() => {
-    navigation.setOptions({ title: t('navAllCategories') });
-  }, [navigation, t]);
+  useScreenTitle('navAllCategories');
   const [builtIn, setBuiltIn] = useState<UiCategory[]>([]);
   const [custom, setCustom] = useState<UiCategory[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const reload = useCallback(async () => {
-    const cc = await loadCustomCategories();
-    const merged = mergeUiCategories(cc, locale);
-    setBuiltIn(merged.filter(x => !x.isCustom));
-    setCustom(merged.filter(x => x.isCustom));
+    setIsLoading(true);
+    try {
+      const cc = await loadCustomCategories();
+      const merged = mergeUiCategories(cc, locale);
+      setBuiltIn(merged.filter(x => !x.isCustom));
+      setCustom(merged.filter(x => x.isCustom));
+    } finally {
+      setIsLoading(false);
+    }
   }, [locale]);
 
   useFocusEffect(
@@ -96,6 +102,10 @@ export function AllCategoriesScreen({ navigation }: Props) {
         {t('allCategoriesHint')}
       </Text>
 
+      {isLoading && builtIn.length === 0 ? (
+        <ScreenLoading minHeight={160} />
+      ) : (
+        <>
       <Text style={[styles.head, { color: colors.text }]}>{t('builtin')}</Text>
       {builtIn.map(item => (
         <CategoryListRow
@@ -123,6 +133,8 @@ export function AllCategoriesScreen({ navigation }: Props) {
           ))}
         </>
       ) : null}
+        </>
+      )}
     </ScrollView>
   );
 }

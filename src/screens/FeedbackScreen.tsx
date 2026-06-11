@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useLayoutEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -9,8 +9,11 @@ import {
   View,
 } from 'react-native';
 
+import { apiSubmitFeedback, type FeedbackIssueType } from '../api/feedback.ts';
 import { AnimatedPressable, animateNextLayout } from '../components/AnimatedPressable';
+import { LoadingButtonContent } from '../components/LoadingButtonContent';
 import { useAppPreferences } from '../context/AppPreferencesContext';
+import { useScreenTitle } from '../hooks/useScreenTitle';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { cardShadow, radii, space } from '../theme/tokens';
 
@@ -24,17 +27,24 @@ const ISSUE_KEYS = [
   'feedbackIssueBalance',
 ] as const;
 
+const ISSUE_TYPE_BY_KEY: Record<(typeof ISSUE_KEYS)[number], FeedbackIssueType> = {
+  feedbackIssueCard: 'card',
+  feedbackIssueTransfer: 'transfer',
+  feedbackIssueLogin: 'login',
+  feedbackIssueCrash: 'crash',
+  feedbackIssueBalance: 'balance',
+};
+
 export function FeedbackScreen({ navigation }: Props) {
   const { colors, t } = useAppPreferences();
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
   const [customText, setCustomText] = useState('');
   const [showCustom, setShowCustom] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useLayoutEffect(() => {
-    navigation.setOptions({ title: t('feedbackTitle') });
-  }, [navigation, t]);
+  useScreenTitle('feedbackTitle');
 
-  const submit = () => {
+  const submit = async () => {
     if (showCustom) {
       if (!customText.trim()) {
         Alert.alert(t('error'), t('feedbackCustomRequired'));
@@ -45,9 +55,24 @@ export function FeedbackScreen({ navigation }: Props) {
       return;
     }
 
-    Alert.alert(t('feedbackThanksTitle'), t('feedbackThanksBody'), [
-      { text: 'OK', onPress: () => navigation.goBack() },
-    ]);
+    const issueType: FeedbackIssueType = showCustom
+      ? 'other'
+      : ISSUE_TYPE_BY_KEY[selectedIssue as (typeof ISSUE_KEYS)[number]];
+    const message = showCustom
+      ? customText.trim()
+      : t(selectedIssue as (typeof ISSUE_KEYS)[number]);
+
+    setIsSubmitting(true);
+    try {
+      await apiSubmitFeedback(issueType, message);
+      Alert.alert(t('feedbackThanksTitle'), t('feedbackThanksBody'), [
+        { text: t('ok'), onPress: () => navigation.goBack() },
+      ]);
+    } catch (e: unknown) {
+      Alert.alert(t('error'), e instanceof Error ? e.message : String(e));
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -117,10 +142,19 @@ export function FeedbackScreen({ navigation }: Props) {
       <AnimatedPressable
         variant="primary"
         onPress={submit}
-        style={[styles.submitBtn, { backgroundColor: colors.brand }, cardShadow(true)]}>
-        <Text style={[styles.submitText, { color: colors.inverseText }]}>
-          {t('feedbackSubmit')}
-        </Text>
+        disabled={isSubmitting}
+        style={[
+          styles.submitBtn,
+          { backgroundColor: colors.brand, opacity: isSubmitting ? 0.7 : 1 },
+          cardShadow(true),
+        ]}>
+        {isSubmitting ? (
+          <LoadingButtonContent label={t('saving')} textColor={colors.inverseText} />
+        ) : (
+          <Text style={[styles.submitText, { color: colors.inverseText }]}>
+            {t('feedbackSubmit')}
+          </Text>
+        )}
       </AnimatedPressable>
     </ScrollView>
   );

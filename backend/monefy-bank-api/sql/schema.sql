@@ -18,6 +18,19 @@ create table if not exists sessions (
   expires_at timestamptz not null
 );
 
+create table if not exists email_verification_codes (
+  id bigserial primary key,
+  email text not null,
+  purpose text not null,
+  code text not null,
+  user_id uuid references users(id) on delete cascade,
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_email_codes_lookup
+  on email_verification_codes (lower(email), purpose);
+
 create table if not exists cards (
   id uuid primary key,
   user_id uuid not null references users(id) on delete cascade,
@@ -66,6 +79,20 @@ create table if not exists transfers (
   status text not null default 'completed',
   created_at timestamptz not null default now()
 );
+
+create table if not exists feedback_reports (
+  id bigserial primary key,
+  user_id uuid not null references users(id) on delete cascade,
+  user_email text not null,
+  user_name text not null default '',
+  issue_type text not null,
+  message text not null default '',
+  status text not null default 'open',
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_feedback_reports_created 
+  on feedback_reports (created_at desc);
 
 insert into categories (id, label, icon_name, icon_color, type) values
   ('Pets', 'Pets', 'Dog', '#F97316', 'expense'),

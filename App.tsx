@@ -3,10 +3,11 @@
  */
 
 import { NavigationContainer } from '@react-navigation/native';
-import React from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { AppSplash } from './src/components/AppSplash';
 import { AppPreferencesProvider, useAppPreferences } from './src/context/AppPreferencesContext';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { SecurityProvider } from './src/context/SecurityContext';
@@ -14,27 +15,29 @@ import { AuthNavigator } from './src/navigation/AuthNavigator';
 import { RootNavigator } from './src/navigation/RootNavigator';
 
 function AppContent() {
-  const { ready, colors } = useAppPreferences();
+  const { ready } = useAppPreferences();
   const { user, isLoading } = useAuth();
+  const [minSplashDone, setMinSplashDone] = useState(false);
 
-  if (!ready || isLoading) {
-    return (
-      <View style={[styles.boot, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.accentMuted} />
-      </View>
-    );
-  }
+  useEffect(() => {
+    const timer = setTimeout(() => setMinSplashDone(true), 1200);
+    return () => clearTimeout(timer);
+  }, []);
 
-  if (!user) {
-    return <AuthNavigator />;
+  if (!ready || isLoading || !minSplashDone) {
+    return <AppSplash />;
   }
 
   return (
-    <SecurityProvider>
-      <NavigationContainer>
-        <RootNavigator />
-      </NavigationContainer>
-    </SecurityProvider>
+    <NavigationContainer>
+      {user ? (
+        <SecurityProvider>
+          <RootNavigator />
+        </SecurityProvider>
+      ) : (
+        <AuthNavigator />
+      )}
+    </NavigationContainer>
   );
 }
 
@@ -55,9 +58,5 @@ function App() {
     </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  boot: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-});
 
 export default App;

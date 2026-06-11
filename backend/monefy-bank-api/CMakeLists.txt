@@ -8,6 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(Drogon CONFIG REQUIRED)
 find_package(OpenSSL REQUIRED)
+find_package(CURL REQUIRED)
 
 find_path(PQXX_INCLUDE_DIR pqxx/pqxx)
 find_library(PQXX_LIBRARY pqxx)
@@ -18,6 +19,7 @@ endif()
 
 add_executable(monefy_bank_api
   src/main.cpp
+  src/email_sender.cpp
 )
 
 target_link_libraries(monefy_bank_api
@@ -25,6 +27,7 @@ target_link_libraries(monefy_bank_api
     Drogon::Drogon
     ${PQXX_LIBRARY}
     OpenSSL::Crypto
+    CURL::libcurl
 )
 
 target_include_directories(monefy_bank_api PRIVATE ${PQXX_INCLUDE_DIR})

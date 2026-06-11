@@ -5,14 +5,12 @@ import { useAppPreferences } from '../context/AppPreferencesContext';
 import { space } from '../theme/tokens';
 
 export function AccountsScreen() {
-  const { colors } = useAppPreferences();
+  const { colors, t } = useAppPreferences();
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Text style={[styles.title, { color: colors.text }]}>Счета</Text>
-      <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-        Управление вашими финансовыми счетами
-      </Text>
+      <Text style={[styles.title, { color: colors.text }]}>{t('accountsTitle')}</Text>
+      <Text style={[styles.subtitle, { color: colors.textMuted }]}>{t('accountsSubtitle')}</Text>
     </View>
   );
 }

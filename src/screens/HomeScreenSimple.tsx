@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnimatedPressable, animateNextLayout } from '../components/AnimatedPressable';
+import { ScreenLoading } from '../components/ScreenLoading';
 import { AppIcon } from '../components/AppIcon';
 import { CompactCardChip } from '../components/CompactCardChip';
 import { CurrencyRatesPanel } from '../components/CurrencyRatesPanel';
@@ -74,6 +75,7 @@ export function HomeScreenSimple() {
   const [coreVer, setCoreVer] = useState('');
   const [recentPayments, setRecentPayments] = useState<RecentPayment[]>([]);
   const [expandedCardNumber, setExpandedCardNumber] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const selectedCard = useMemo(
     () => cards.find(c => c.number === selectedCardNumber) ?? null,
@@ -84,6 +86,7 @@ export function HomeScreenSimple() {
   const hasMoreCards = cards.length > MAX_HOME_CARDS;
 
   const reload = useCallback(async () => {
+    setIsLoading(true);
     try {
       const [cJson, trJson, allTrJson, ver, cc] = await Promise.all([
         MonefyCore.getCardsJson(),
@@ -115,6 +118,8 @@ export function HomeScreenSimple() {
       });
     } catch (e) {
       console.warn(e);
+    } finally {
+      setIsLoading(false);
     }
   }, [dayIso, user?.id]);
 
@@ -312,7 +317,9 @@ export function HomeScreenSimple() {
             {t('myCards').toUpperCase()}
           </Text>
 
-          {cards.length === 0 ? (
+          {isLoading && cards.length === 0 ? (
+            <ScreenLoading minHeight={160} />
+          ) : cards.length === 0 ? (
             <AnimatedPressable
               variant="tile"
               onPress={() => navigation.navigate('AddCard')}
